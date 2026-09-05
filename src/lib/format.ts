@@ -33,3 +33,15 @@ const numberFormatter = new Intl.NumberFormat("he-IL", {
 export function formatCurrencyILS(amount: number): string {
   return `₪${numberFormatter.format(amount)}`;
 }
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) {
+    return `${kilobytes.toFixed(0)} KB`;
+  }
+  const megabytes = kilobytes / 1024;
+  return `${megabytes.toFixed(1)} MB`;
+}
