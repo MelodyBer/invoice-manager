@@ -13,6 +13,17 @@ import { buildStoragePath, getExtensionFromMimeType } from "@/lib/upload/storage
 import type { Direction } from "@/types/db";
 import type { UploadFileItem } from "@/types/upload";
 
+interface ExtractResponsePayload {
+  success: boolean;
+  error?: string;
+}
+
+const IN_PROGRESS_STATUSES: readonly UploadFileItem["status"][] = [
+  "compressing",
+  "uploading",
+  "extracting",
+];
+
 export default function UploadPage(): React.JSX.Element {
   const router = useRouter();
   const { showToast } = useToast();
@@ -46,9 +57,7 @@ export default function UploadPage(): React.JSX.Element {
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent): void {
-      const hasActiveUpload = files.some(
-        (item) => item.status === "uploading" || item.status === "compressing"
-      );
+      const hasActiveUpload = files.some((item) => IN_PROGRESS_STATUSES.includes(item.status));
       if (hasActiveUpload) {
         event.preventDefault();
         event.returnValue = "";
@@ -80,6 +89,7 @@ export default function UploadPage(): React.JSX.Element {
         status: "pending",
         progressPercent: 0,
         errorMessage: null,
+        documentId: null,
       });
     }
 
@@ -98,8 +108,43 @@ export default function UploadPage(): React.JSX.Element {
     });
   }
 
+  const runExtraction = useCallback(
+    async (itemId: string, documentId: string): Promise<boolean> => {
+      updateItem(itemId, { status: "extracting", progressPercent: 85, errorMessage: null });
+
+      try {
+        const response = await fetch(`/api/documents/${documentId}/extract`, {
+          method: "POST",
+        });
+        const payload = (await response.json()) as ExtractResponsePayload;
+
+        if (!response.ok || !payload.success) {
+          updateItem(itemId, {
+            status: "extraction_failed",
+            errorMessage: payload.error ?? "זיהוי הנתונים נכשל.",
+          });
+          return false;
+        }
+      } catch {
+        updateItem(itemId, {
+          status: "extraction_failed",
+          errorMessage: "זיהוי הנתונים נכשל. בדקי את החיבור ונסי שוב.",
+        });
+        return false;
+      }
+
+      updateItem(itemId, { status: "success", progressPercent: 100, errorMessage: null });
+      return true;
+    },
+    [updateItem]
+  );
+
   const uploadSingleFile = useCallback(
-    async (item: UploadFileItem, uploadUserId: string, uploadDirection: Direction): Promise<boolean> => {
+    async (
+      item: UploadFileItem,
+      uploadUserId: string,
+      uploadDirection: Direction
+    ): Promise<boolean> => {
       updateItem(item.id, { status: "compressing", progressPercent: 20, errorMessage: null });
 
       if (!navigator.onLine) {
@@ -140,17 +185,21 @@ export default function UploadPage(): React.JSX.Element {
         return false;
       }
 
-      const { error: insertError } = await supabase.from("documents").insert({
-        user_id: uploadUserId,
-        direction: uploadDirection,
-        storage_path: storagePath,
-        file_name: item.file.name,
-        mime_type: mimeType || "application/octet-stream",
-        file_size: fileToUpload.size,
-        status: "pending",
-      });
+      const { data: insertedDocument, error: insertError } = await supabase
+        .from("documents")
+        .insert({
+          user_id: uploadUserId,
+          direction: uploadDirection,
+          storage_path: storagePath,
+          file_name: item.file.name,
+          mime_type: mimeType || "application/octet-stream",
+          file_size: fileToUpload.size,
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
-      if (insertError) {
+      if (insertError || !insertedDocument) {
         updateItem(item.id, {
           status: "error",
           errorMessage: "הקובץ הועלה אך שמירת הפרטים נכשלה. נסי שוב.",
@@ -158,10 +207,10 @@ export default function UploadPage(): React.JSX.Element {
         return false;
       }
 
-      updateItem(item.id, { status: "success", progressPercent: 100, errorMessage: null });
-      return true;
+      updateItem(item.id, { documentId: insertedDocument.id });
+      return runExtraction(item.id, insertedDocument.id);
     },
-    [supabase, updateItem]
+    [supabase, updateItem, runExtraction]
   );
 
   async function handleRetry(id: string): Promise<void> {
@@ -174,6 +223,18 @@ export default function UploadPage(): React.JSX.Element {
       return;
     }
     await uploadSingleFile(item, userId, direction);
+  }
+
+  async function handleRetryExtraction(id: string): Promise<void> {
+    const item = filesRef.current.find((current) => current.id === id);
+    if (!item?.documentId) {
+      return;
+    }
+    await runExtraction(id, item.documentId);
+  }
+
+  function handleManualEntry(): void {
+    router.push("/documents");
   }
 
   async function handleUploadAll(): Promise<void> {
@@ -189,12 +250,17 @@ export default function UploadPage(): React.JSX.Element {
 
     setIsUploading(true);
     const results = await Promise.all(
-      itemsToUpload.map((item) => uploadSingleFile(item, userId, direction))
+      itemsToUpload.map((item) => {
+        if (item.status === "extraction_failed" && item.documentId) {
+          return runExtraction(item.id, item.documentId);
+        }
+        return uploadSingleFile(item, userId, direction);
+      })
     );
     setIsUploading(false);
 
     if (results.every(Boolean)) {
-      showToast("כל המסמכים הועלו בהצלחה");
+      showToast("כל המסמכים הועלו וזוהו בהצלחה");
       router.push("/documents");
     }
   }
@@ -214,7 +280,14 @@ export default function UploadPage(): React.JSX.Element {
         {hasFiles ? (
           <ul className="flex flex-col gap-2">
             {files.map((item) => (
-              <FileListItem key={item.id} item={item} onRemove={handleRemove} onRetry={handleRetry} />
+              <FileListItem
+                key={item.id}
+                item={item}
+                onRemove={handleRemove}
+                onRetry={handleRetry}
+                onRetryExtraction={handleRetryExtraction}
+                onManualEntry={handleManualEntry}
+              />
             ))}
           </ul>
         ) : null}

@@ -1,4 +1,11 @@
-export type UploadFileStatus = "pending" | "compressing" | "uploading" | "success" | "error";
+export type UploadFileStatus =
+  | "pending"
+  | "compressing"
+  | "uploading"
+  | "extracting"
+  | "success"
+  | "error"
+  | "extraction_failed";
 
 export interface UploadFileItem {
   id: string;
@@ -7,4 +14,5 @@ export interface UploadFileItem {
   status: UploadFileStatus;
   progressPercent: number;
   errorMessage: string | null;
+  documentId: string | null;
 }
