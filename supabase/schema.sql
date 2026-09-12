@@ -104,9 +104,12 @@ create index if not exists transactions_user_direction_idx
   on public.transactions (user_id, direction);
 
 -- ----------------------------------------------------------------------------
--- 7. מניעת שמירת אותו מסמך פעמיים (אותו user_id + counterparty_name + doc_number + doc_date)
+-- 7. זיהוי כפילויות אפשריות (אותו user_id + counterparty_name + doc_number + doc_date)
+--    אינדקס רגיל (לא ייחודי) לביצועים בבדיקת כפילות באפליקציה בלבד.
+--    הבדיקה עצמה, כולל אפשרות "שמור בכל זאת", מתבצעת ברמת האפליקציה
+--    (מסך אישור המסמך) ולא כאילוץ קשיח במסד הנתונים.
 -- ----------------------------------------------------------------------------
-create unique index if not exists transactions_dedupe_idx
+create index if not exists transactions_dedupe_idx
   on public.transactions (user_id, counterparty_name, doc_number, doc_date);
 
 -- ----------------------------------------------------------------------------

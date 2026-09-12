@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Badge, Card, EmptyState, Spinner } from "@/components/ui";
@@ -19,9 +20,12 @@ export default function DocumentsPage(): React.JSX.Element {
   useEffect(() => {
     async function loadDocuments(): Promise<void> {
       const supabase = createClient();
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) { setDocuments([]); return; }
       const { data } = await supabase
         .from("documents")
         .select("*")
+        .eq("user_id", auth.user.id)
         .order("uploaded_at", { ascending: false });
       setDocuments(data ?? []);
     }
@@ -53,9 +57,19 @@ export default function DocumentsPage(): React.JSX.Element {
                     {STATUS_LABELS[doc.status]}
                   </p>
                 </div>
-                <Badge variant={doc.direction === "income" ? "income" : "expense"}>
-                  {doc.direction === "income" ? "הכנסה" : "הוצאה"}
-                </Badge>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Badge variant={doc.direction === "income" ? "income" : "expense"}>
+                    {doc.direction === "income" ? "הכנסה" : "הוצאה"}
+                  </Badge>
+                  {doc.status !== "processing" ? (
+                    <Link
+                      href={`/documents/${doc.id}/review`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      לאישור
+                    </Link>
+                  ) : null}
+                </div>
               </Card>
             </li>
           ))}

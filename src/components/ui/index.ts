@@ -9,3 +9,5 @@ export type { BadgeVariant } from "./Badge";
 export { EmptyState } from "./EmptyState";
 export { Spinner } from "./Spinner";
 export { ToastProvider, useToast } from "./Toast";
+export { Dialog } from "./Dialog";
+export { HebrewDatePicker } from "./HebrewDatePicker";

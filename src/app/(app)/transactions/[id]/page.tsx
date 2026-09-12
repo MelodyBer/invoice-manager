@@ -1,0 +1,14 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { formatCurrencyILS, formatDateDDMMYYYY } from "@/lib/format";
+
+export default async function TransactionPage({ params }: { params: Promise<{ id: string }> }): Promise<React.JSX.Element> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) redirect("/login");
+  const { data } = await supabase.from("transactions").select("*").eq("user_id", auth.user.id).eq("id", id).maybeSingle();
+  if (!data) notFound();
+  return <section className="flex flex-col gap-4"><h1 className="text-2xl font-bold">פרטי התנועה</h1><p>{data.counterparty_name}</p><p>מספר מסמך: {data.doc_number ?? "לא צוין"}</p><p>תאריך: {formatDateDDMMYYYY(data.doc_date)}</p><p>סכום כולל: {formatCurrencyILS(data.amount_total)}</p><p>{data.notes}</p><Link href="/transactions">חזרה לתנועות</Link></section>;
+}

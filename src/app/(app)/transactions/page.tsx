@@ -1,9 +1,15 @@
-import { EmptyState } from "@/components/ui";
+import Link from "next/link";
+import { Button, EmptyState } from "@/components/ui";
 
 export default function TransactionsPage(): React.JSX.Element {
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold text-foreground">תנועות</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-foreground">תנועות</h1>
+        <Link href="/transactions/new">
+          <Button>תנועה חדשה</Button>
+        </Link>
+      </div>
       <EmptyState title="רשימת התנועות תוצג כאן" description="מסך זה ייבנה בשלב הבא." />
     </div>
   );

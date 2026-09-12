@@ -7,6 +7,7 @@
   --primary: #2563eb;
   --income: #16a34a;
   --expense: #dc2626;
+  --warning: #b45309;
 }
 
 @theme inline {
@@ -16,6 +17,7 @@
   --color-primary: var(--primary);
   --color-income: var(--income);
   --color-expense: var(--expense);
+  --color-warning: var(--warning);
   --font-sans: var(--font-heebo);
 }
 
@@ -27,6 +29,7 @@
     --primary: #3b82f6;
     --income: #22c55e;
     --expense: #ef4444;
+    --warning: #f59e0b;
   }
 }
 
