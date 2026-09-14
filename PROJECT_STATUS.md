@@ -53,3 +53,6 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - בדיקות הטופס לחישוב ללא מע״מ ובניית הייצור עברו. טרם נמדדה מהירות מתוך חשבון מחובר; אין טענה שהאיטיות נפתרה במלואה.
 - קבצים: src/components/transactions/TransactionForm.tsx, src/lib/transactions/use-transaction-form.ts, src/lib/transactions/build-initial-values.ts, src/lib/extraction/schema.ts, src/lib/extraction/validate-result.ts, src/lib/transactions/load-range.ts, src/app/(app)/layout.tsx, src/app/(app)/calendar/page.tsx, src/app/(app)/loading.tsx, scripts/test-transactions.cjs, PROJECT_STATUS.md.
 - בדיקה ידנית: אישור מסמך ללא מע״מ בסך 250 ₪, שינוי הסכום והקטגוריה, שמירה ופתיחה מחדש; בדיקת מסמך רגיל; ניווט תנועות ותאריכון בטלפון.
+
+
+עדכון המשך ביצועים: המשתמשת דיווחה על איטיות בניווט, בזיהוי ובפתיחה ושמירה. מדידה בודדת לדף login הראתה כ־0.9 שניות לתגובה ראשונה; אין מדידת חשבון מחובר. קריאות קטגוריות ומסמך בפרטי תנועה ובבדיקות לפני יצירה מופעלות במקביל. נוספו זמני queue/download/recognition/save ביומן השרת תחת extraction_timing בלבד, בלי נתוני מסמכים, מזהי משתמשים או סודות. נוספו מסנני user_id לעדכוני סטטוס ותוצאות חילוץ. עדיין יש למדוד זיהוי אמיתי לפני קביעה שהוא הואץ. קבצים: src/lib/transactions/detail-actions.ts, src/lib/transactions/save-transaction.ts, src/lib/extraction/extract-document.ts, src/app/api/documents/[id]/extract/route.ts, PROJECT_STATUS.md.

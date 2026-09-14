@@ -10,14 +10,16 @@ export async function getDetail(id: string): Promise<{ detail?: Detail; error?: 
   const { supabase, userId } = await userContext();
   const { data: transaction, error } = await supabase.from("transactions").select("*").eq("user_id", userId).eq("id", id).maybeSingle();
   if (error || !transaction) return { error: "התנועה לא נמצאה או שאין הרשאה לצפות בה." };
-  const { data: categories, error: categoryError } = await supabase.from("categories").select("*").eq("user_id", userId).order("name");
-  if (categoryError) return { error: "לא ניתן לטעון את הקטגוריות." };
-  let document: DocumentRow | null = null;
-  if (transaction.document_id) {
-    const response = await supabase.from("documents").select("*").eq("user_id", userId).eq("id", transaction.document_id).maybeSingle();
-    if (response.error) return { error: "לא ניתן לטעון את המסמך." };
-    document = response.data;
-  }
+  const [categoryResult, documentResult] = await Promise.all([
+    supabase.from("categories").select("*").eq("user_id", userId).order("name"),
+    transaction.document_id
+      ? supabase.from("documents").select("*").eq("user_id", userId).eq("id", transaction.document_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (categoryResult.error) return { error: "לא ניתן לטעון את הקטגוריות." };
+  if (documentResult.error) return { error: "לא ניתן לטעון את המסמך." };
+  const categories = categoryResult.data;
+  const document = documentResult.data;
   return { detail: { transaction, document, categories: categories ?? [] } };
 }
 export async function updateTransaction(id: string, values: TransactionFormValues, expectedUpdatedAt: string, allowDuplicate = false): Promise<ActionResult> {

@@ -28,7 +28,7 @@ export async function POST(
     return NextResponse.json({ success: false, error: "המסמך לא נמצא." }, { status: 404 });
   }
 
-  await supabase.from("documents").update({ status: "processing" }).eq("id", id);
+  await supabase.from("documents").update({ status: "processing" }).eq("id", id).eq("user_id", user.id);
 
   try {
     const result = await extractDocumentData(supabase, document);
@@ -38,7 +38,7 @@ export async function POST(
     await supabase
       .from("documents")
       .update({ status: "failed", error_message: message })
-      .eq("id", id);
+      .eq("id", id).eq("user_id", user.id);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

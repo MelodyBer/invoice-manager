@@ -42,7 +42,12 @@ export async function extractDocumentData(
   supabase: AppSupabaseClient,
   document: DocumentRow
 ): Promise<ValidatedExtractionResult> {
+  const requestedAt = performance.now();
   return withExtractionConcurrencyLimit(async () => {
+    let stage = "download";
+    let startedAt = performance.now();
+    console.info("extraction_timing", { stage: "queue", durationMs: Math.round(startedAt - requestedAt) });
+    try {
     const { data: fileBlob, error: downloadError } = await supabase.storage
       .from("documents")
       .download(document.storage_path);
@@ -55,6 +60,8 @@ export async function extractDocumentData(
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const contentBlock = buildContentBlock(document.mime_type, base64Data);
 
+    console.info("extraction_timing", { stage, durationMs: Math.round(performance.now() - startedAt) });
+    stage = "recognition"; startedAt = performance.now();
     const client = getAnthropicClient();
 
     let response: Anthropic.Message;
@@ -104,6 +111,8 @@ export async function extractDocumentData(
 
     const validated = applyBusinessValidation(parsed);
 
+    console.info("extraction_timing", { stage, durationMs: Math.round(performance.now() - startedAt) });
+    stage = "save"; startedAt = performance.now();
     const { error: updateError } = await supabase
       .from("documents")
       .update({
@@ -111,12 +120,16 @@ export async function extractDocumentData(
         extraction_raw: validated,
         error_message: null,
       })
-      .eq("id", document.id);
+      .eq("id", document.id)
+      .eq("user_id", document.user_id);
 
     if (updateError) {
       throw new ExtractionError("הנתונים חולצו אך שמירתם במסד הנתונים נכשלה.");
     }
 
     return validated;
+    } finally {
+      console.info("extraction_timing", { stage, durationMs: Math.round(performance.now() - startedAt) });
+    }
   });
 }

@@ -21,14 +21,12 @@ export async function insertTransaction(
 ): Promise<SaveTransactionResult> {
   const validation = validateTransactionValues(values);
   if (validation) return { errorMessage: validation };
-  if (documentId) {
-    const { data, error } = await supabase.from("documents").select("id").eq("user_id", userId).eq("id", documentId).single();
-    if (error || !data) return { errorMessage: "המסמך לא נמצא או שאין הרשאה לשמור אותו." };
-  }
-  if (values.categoryId) {
-    const { data, error } = await supabase.from("categories").select("id").eq("user_id", userId).eq("id", values.categoryId).eq("direction", values.direction).single();
-    if (error || !data) return { errorMessage: "הקטגוריה אינה מתאימה לתנועה." };
-  }
+  const [document, category] = await Promise.all([
+    documentId ? supabase.from("documents").select("id").eq("user_id", userId).eq("id", documentId).single() : Promise.resolve(null),
+    values.categoryId ? supabase.from("categories").select("id").eq("user_id", userId).eq("id", values.categoryId).eq("direction", values.direction).single() : Promise.resolve(null),
+  ]);
+  if (documentId && (document?.error || !document?.data)) return { errorMessage: "המסמך לא נמצא או שאין הרשאה לשמור אותו." };
+  if (values.categoryId && (category?.error || !category?.data)) return { errorMessage: "הקטגוריה אינה מתאימה לתנועה." };
   const { error } = await supabase.from("transactions").insert({
     user_id: userId,
     document_id: documentId,
