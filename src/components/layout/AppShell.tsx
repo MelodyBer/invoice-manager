@@ -44,7 +44,7 @@ export function AppShell({ businessName, children }: AppShellProps): React.JSX.E
         </nav>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-3">
             <button
@@ -62,7 +62,7 @@ export function AppShell({ businessName, children }: AppShellProps): React.JSX.E
           </Button>
         </header>
 
-        <main className="flex-1 p-4">{children}</main>
+        <main className="min-w-0 flex-1 p-4">{children}</main>
       </div>
 
       {isMobileMenuOpen ? (

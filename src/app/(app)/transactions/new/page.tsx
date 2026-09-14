@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { validDate } from "@/lib/transactions/reporting";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -59,7 +60,8 @@ export default function NewTransactionPage(): React.JSX.Element {
 
       setUserId(currentUserId);
       setCategories(categoriesData ?? []);
-      form.resetTo(buildEmptyManualValues(profileData ?? null));
+      const date = new URLSearchParams(window.location.search).get("date") ?? "";
+      form.resetTo({ ...buildEmptyManualValues(profileData ?? null), docDate: validDate(date) ? date : "" });
       setIsLoading(false);
     }
 
@@ -86,7 +88,7 @@ export default function NewTransactionPage(): React.JSX.Element {
     }
 
     showToast("התנועה נשמרה בהצלחה");
-    router.push("/documents");
+    router.push("/transactions");
   }
 
   async function handleSaveClick(): Promise<void> {
