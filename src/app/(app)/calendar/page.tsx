@@ -12,9 +12,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const nextMonth = new Date(Date.UTC(year, number, 1)).toISOString().slice(0, 7); const previousMonth = new Date(Date.UTC(year, number - 2, 1)).toISOString().slice(0, 7);
   const selected = validDate(first(params.day)) && first(params.day).startsWith(month) ? first(params.day) : today.startsWith(month) ? today : range.start;
   const { supabase, userId } = await userContext();
-  let rows: TransactionRow[];
-  try { rows = await loadRange(supabase, userId, range.start, range.end); } catch { return <p role="alert">לא ניתן לטעון את התאריכון. רענני את הדף ונסי שוב.</p>; }
-  const [categoriesResult, docs] = await Promise.all([supabase.from("categories").select("id, name").eq("user_id", userId), supabase.from("documents").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("uploaded_at", israelMidnight(range.start)).lt("uploaded_at", israelMidnight(`${nextMonth}-01`))]);
+  let result: Awaited<ReturnType<typeof loadCalendar>>;
+  async function loadCalendar() {
+    return Promise.all([loadRange(supabase, userId, range.start, range.end), supabase.from("categories").select("id, name").eq("user_id", userId), supabase.from("documents").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("uploaded_at", israelMidnight(range.start)).lt("uploaded_at", israelMidnight(`${nextMonth}-01`))]);
+  }
+  try { result = await loadCalendar(); } catch { return <p role="alert">לא ניתן לטעון את התאריכון. רענני את הדף ונסי שוב.</p>; }
+  const [rows, categoriesResult, docs] = result;
   if (categoriesResult.error || docs.error) return <p role="alert">לא ניתן לטעון את הסיכום החודשי. נסי שוב.</p>;
   const categories = Object.fromEntries((categoriesResult.data ?? []).map(category => [category.id, category.name]));
   const days = new Map<string, TransactionRow[]>(); for (const row of rows) { const list = days.get(row.doc_date) ?? []; list.push(row); days.set(row.doc_date, list); }

@@ -1,13 +1,14 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { TransactionRow } from "@/types/db";
-export async function userContext() {
+export const userContext = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) redirect("/login");
   return { supabase, userId: data.user.id };
-}
+});
 export async function loadRange(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, start: string, end: string): Promise<TransactionRow[]> {
   const rows: TransactionRow[] = [];
   // Supabase caps a single response. Read only the requested date range in batches.

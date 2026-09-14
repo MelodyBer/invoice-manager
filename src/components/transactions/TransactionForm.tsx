@@ -38,7 +38,8 @@ export function TransactionForm({
     .filter((category) => category.direction === values.direction)
     .map((category) => ({ value: category.id, label: category.name }));
 
-  const showVatDeductibleField = values.direction === "expense";
+  const withoutVat = values.vatRate.trim() !== "" && Number(values.vatRate) === 0;
+  const showVatDeductibleField = values.direction === "expense" && !withoutVat;
   const showVatWarning =
     showVatDeductibleField &&
     !TAX_DEDUCTIBLE_DOC_TYPES.includes(values.docType) &&
@@ -100,6 +101,12 @@ export function TransactionForm({
         warning={isLowConfidence(confidence, "doc_date") ? LOW_CONFIDENCE_HINT : undefined}
       />
 
+      <label className="flex items-center gap-2 rounded-lg border border-border p-3">
+        <input type="checkbox" checked={withoutVat} onChange={(event) => onFieldChange({ vatRate: event.target.checked ? "0" : "18" })} />
+        <span>ללא מע״מ (למשל, מסמך מעוסק פטור)</span>
+      </label>
+      {withoutVat && <p className="text-sm text-foreground/70">כל הסכום נרשם ללא מע״מ. אין מע״מ תשומות לקיזוז.</p>}
+
       <Input
         id="amount-before-vat"
         label="סכום לפני מע״מ"
@@ -112,6 +119,7 @@ export function TransactionForm({
 
       <Input
         id="vat-amount"
+        disabled={withoutVat}
         label={isVatManuallyEdited ? "סכום מע״מ — נערך ידנית" : "סכום מע״מ"}
         type="number"
         step="0.01"

@@ -82,7 +82,7 @@ export function buildInitialValuesFromExtraction(
     vatAmount: vatAmount !== null ? String(vatAmount) : "",
     amountTotal: amountTotal !== null ? String(amountTotal) : "",
     vatRate: vatRate !== null ? String(vatRate) : profile ? String(profile.vat_rate) : "18",
-    vatDeductiblePercent: 100,
+    vatDeductiblePercent: vatRate === 0 ? 0 : 100,
     categoryId: null,
     notes: getStringField(extractionRaw, "notes"),
   };

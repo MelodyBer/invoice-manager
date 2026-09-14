@@ -17,7 +17,7 @@ export function applyBusinessValidation(result: ExtractionResult): ValidatedExtr
 
   const computedTotal = amountBeforeVat + vatAmount;
   if (Math.abs(computedTotal - amountTotal) > AGORA_TOLERANCE) {
-    const vatRate = result.vat_rate > 0 ? result.vat_rate : DEFAULT_VAT_RATE;
+    const vatRate = result.vat_rate >= 0 ? result.vat_rate : DEFAULT_VAT_RATE;
     amountBeforeVat = round2(amountTotal / (1 + vatRate / 100));
     vatAmount = round2(amountTotal - amountBeforeVat);
     notesToAppend.push("הסכומים לא התאזנו — חושבו מחדש מתוך הסכום הכולל.");

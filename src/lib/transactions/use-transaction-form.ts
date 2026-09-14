@@ -25,9 +25,19 @@ export function useTransactionForm(initialValues: TransactionFormValues): UseTra
 
   const setField = useCallback(
     (patch: Partial<TransactionFormValues>) => {
-      if ("vatAmount" in patch) setIsVatManuallyEdited(true);
+      if ("vatRate" in patch && Number(patch.vatRate) === 0) setIsVatManuallyEdited(false);
+      else if ("vatAmount" in patch) setIsVatManuallyEdited(true);
       setValues((prev) => {
         const next: TransactionFormValues = { ...prev, ...patch };
+
+        if (Number(next.vatRate) === 0) {
+          const amount = "amountBeforeVat" in patch ? next.amountBeforeVat : next.amountTotal || next.amountBeforeVat;
+          next.amountTotal = amount;
+          next.amountBeforeVat = amount;
+          next.vatAmount = "0";
+          next.vatDeductiblePercent = 0;
+          return next;
+        }
 
         if ("amountTotal" in patch) {
           const total = toNumber(next.amountTotal);

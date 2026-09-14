@@ -43,3 +43,13 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 
 ## הבדיקות הבאות
 סינון תאריכים/קטגוריה/סוג/חיפוש; מיון כל עמודה; עימוד עם סיכומים קבועים; פתיחת מסמך, עריכה ורענון; ביטול מחיקה ומחיקת נתון בדיקה בלבד; ניווט תאריכון ותאריך מוכן בהזנה ידנית; תצוגת מובייל; בידוד בין שני משתמשים.
+
+
+עדכון: אפשרות ללא מע״מ ושיפור תגובה
+- בטופס המשותף נוספה בחירת ללא מע״מ, שמאפסת שיעור וסכום מע״מ והכרה, תוך שמירת הסכום הכולל. ביטול הבחירה חוזר ל־18%; ניתן לערוך את השיעור.
+- חילוץ מקבל הנחיה מפורשת למסמך עוסק פטור; תיקון סכומים מכבד שיעור אפס.
+- אימות המשתמש משותף בין מעטפת ודף באותה בקשת שרת בלבד באמצעות React cache; אין מטמון משותף למשתמשים. אימות middleware ו־RLS נשארים פעילים.
+- בתאריכון קריאות בלתי תלויות נשלחות במקביל ונוסף מסך טעינה למעטפת.
+- בדיקות הטופס לחישוב ללא מע״מ ובניית הייצור עברו. טרם נמדדה מהירות מתוך חשבון מחובר; אין טענה שהאיטיות נפתרה במלואה.
+- קבצים: src/components/transactions/TransactionForm.tsx, src/lib/transactions/use-transaction-form.ts, src/lib/transactions/build-initial-values.ts, src/lib/extraction/schema.ts, src/lib/extraction/validate-result.ts, src/lib/transactions/load-range.ts, src/app/(app)/layout.tsx, src/app/(app)/calendar/page.tsx, src/app/(app)/loading.tsx, scripts/test-transactions.cjs, PROJECT_STATUS.md.
+- בדיקה ידנית: אישור מסמך ללא מע״מ בסך 250 ₪, שינוי הסכום והקטגוריה, שמירה ופתיחה מחדש; בדיקת מסמך רגיל; ניווט תנועות ותאריכון בטלפון.

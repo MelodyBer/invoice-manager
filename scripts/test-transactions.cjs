@@ -83,3 +83,32 @@ function database(responses) {
   assert.equal(duplicate.calls.length, 1);
   console.log("Passed: date ranges, leap year, Jerusalem boundaries, VAT recognition, pagination beyond 500, owner scoping, shared-file protection, manual deletion, stale edits and duplicate detection.");
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+// Exercise the real form hook with a minimal state harness; no live data.
+let hookStates = []; let hookIndex = 0;
+const hook = load("src/lib/transactions/use-transaction-form.ts", { react: {
+  useCallback: callback => callback,
+  useState: initial => { const index = hookIndex++; if (!(index in hookStates)) hookStates[index] = initial; return [hookStates[index], value => { hookStates[index] = typeof value === "function" ? value(hookStates[index]) : value; }]; }
+} });
+const initial = { vatRate: "18", amountBeforeVat: "100", vatAmount: "18", amountTotal: "118", vatDeductiblePercent: 100 };
+function renderForm() { hookIndex = 0; return hook.useTransactionForm(initial); }
+renderForm().setField({ vatAmount: "20" });
+assert.equal(renderForm().isVatManuallyEdited, true);
+renderForm().setField({ vatRate: "0" });
+assert.equal(renderForm().isVatManuallyEdited, false);
+assert.equal(renderForm().values.amountTotal, "120");
+assert.equal(renderForm().values.amountBeforeVat, "120");
+assert.equal(renderForm().values.vatAmount, "0");
+renderForm().setField({ amountTotal: "250.50" });
+assert.equal(renderForm().values.amountBeforeVat, "250.50");
+renderForm().setField({ vatDeductiblePercent: 100 });
+assert.equal(renderForm().values.vatDeductiblePercent, 0);
+renderForm().setField({ amountBeforeVat: "300" });
+assert.equal(renderForm().values.amountTotal, "300");
+renderForm().setField({ vatRate: "18" });
+assert.equal(renderForm().values.vatAmount, "54");
+const validation = load("src/lib/extraction/validate-result.ts");
+const extracted = validation.applyBusinessValidation({ amount_before_vat: 100, vat_amount: 0, amount_total: 120, vat_rate: 0, doc_date: "2026-01-01", notes: null });
+assert.equal(extracted.amount_before_vat, 120);
+assert.equal(extracted.vat_amount, 0);
+console.log("Passed: no-VAT preserves paid total, resets manual VAT, keeps category deduction at zero, supports amount edits and zero-rate extraction correction.");

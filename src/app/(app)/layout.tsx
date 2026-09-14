@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { userContext } from "@/lib/transactions/load-range";
 import { AppShell } from "@/components/layout/AppShell";
 
 export default async function AppLayout({
@@ -7,19 +6,12 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, userId } = await userContext();
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("business_name")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   return <AppShell businessName={profile?.business_name ?? null}>{children}</AppShell>;
