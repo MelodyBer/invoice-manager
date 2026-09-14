@@ -5,6 +5,7 @@ export const EXTRACTION_TOOL_NAME = "extract_document_data";
 export const SYSTEM_PROMPT = `את עוזרת שמחלצת נתונים ממסמכי הנהלת חשבונות (חשבוניות, קבלות, הצעות מחיר) עבור עוסק מורשה בישראל.
 
 הנחיות חשובות:
+- סוג התנועה קובע את הצד שכנגד: בהוצאה חלצי את שם הספק שהנפיק את המסמך. בהכנסה חלצי את שם הלקוח מתוך לכבוד, שם לקוח, נמען או מקבל השירות, ולא את שם המנפיק או מי שמקבל את התשלום. גם business_number שייך לצד זה. אם אין שם ברור החזירי מחרוזת ריקה ו-confidence.counterparty_name=0, ולא שם של הצד השני.
 - כל המסמכים בעברית, מישראל, והסכומים בהם הם בשקלים חדשים (₪), אלא אם צוין אחרת במפורש במסמך.
 - תאריכים במסמכים ישראליים נכתבים בפורמט יום/חודש/שנה. לדוגמה: 03/04/2026 פירושו 3 באפריל 2026, ולא 4 במרץ. יש להחזיר את התאריך בפורמט YYYY-MM-DD.
 - "סה״כ לתשלום" או "סה״כ כולל מע״מ" הם amount_total (הסכום הכולל).
@@ -23,11 +24,11 @@ export const EXTRACTION_INPUT_SCHEMA: Anthropic.Tool.InputSchema = {
   properties: {
     counterparty_name: {
       type: "string",
-      description: "שם העסק שהוציא את המסמך (הספק או נותן השירות).",
+      description: "הצד שכנגד: בהוצאה שם הספק שהוציא את המסמך; בהכנסה שם הלקוח המופיע בשדה לכבוד, לקוח או מקבל השירות.",
     },
     business_number: {
       type: ["string", "null"],
-      description: "מספר ח.פ. או מספר עוסק מורשה של העסק המנפיק, אם מופיע במסמך.",
+      description: "מספר העסק של הצד שכנגד: ספק בהוצאה, לקוח בהכנסה; null אם אינו מופיע.",
     },
     doc_number: {
       type: ["string", "null"],
@@ -106,3 +107,7 @@ export const EXTRACTION_TOOL = {
   strict: true,
   input_schema: EXTRACTION_INPUT_SCHEMA,
 };
+
+export function extractionInstruction(direction: "income" | "expense"): string {
+  return `${USER_INSTRUCTION} סוג התנועה: ${direction === "income" ? "הכנסה — חלצי את שם הלקוח, ולא את שם העסק המנפיק או מקבל התשלום." : "הוצאה — חלצי את שם הספק שהנפיק את המסמך."}`;
+}

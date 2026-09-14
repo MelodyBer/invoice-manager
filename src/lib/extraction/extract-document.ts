@@ -5,7 +5,7 @@ import type { ValidatedExtractionResult } from "@/types/extraction";
 import { getAnthropicClient } from "./anthropic-client";
 import { withExtractionConcurrencyLimit } from "./concurrency-limiter";
 import { parseExtractionResult } from "./parse-result";
-import { EXTRACTION_INPUT_SCHEMA, EXTRACTION_TOOL_NAME, SYSTEM_PROMPT, USER_INSTRUCTION } from "./schema";
+import { EXTRACTION_INPUT_SCHEMA, EXTRACTION_TOOL_NAME, SYSTEM_PROMPT, extractionInstruction } from "./schema";
 import { applyBusinessValidation } from "./validate-result";
 
 export class ExtractionError extends Error {}
@@ -83,7 +83,7 @@ export async function extractDocumentData(
         messages: [
           {
             role: "user",
-            content: [contentBlock, { type: "text", text: USER_INSTRUCTION }],
+            content: [contentBlock, { type: "text", text: extractionInstruction(document.direction) }],
           },
         ],
       });

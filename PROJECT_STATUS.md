@@ -56,3 +56,14 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 
 
 עדכון המשך ביצועים: המשתמשת דיווחה על איטיות בניווט, בזיהוי ובפתיחה ושמירה. מדידה בודדת לדף login הראתה כ־0.9 שניות לתגובה ראשונה; אין מדידת חשבון מחובר. קריאות קטגוריות ומסמך בפרטי תנועה ובבדיקות לפני יצירה מופעלות במקביל. נוספו זמני queue/download/recognition/save ביומן השרת תחת extraction_timing בלבד, בלי נתוני מסמכים, מזהי משתמשים או סודות. נוספו מסנני user_id לעדכוני סטטוס ותוצאות חילוץ. עדיין יש למדוד זיהוי אמיתי לפני קביעה שהוא הואץ. קבצים: src/lib/transactions/detail-actions.ts, src/lib/transactions/save-transaction.ts, src/lib/extraction/extract-document.ts, src/app/api/documents/[id]/extract/route.ts, PROJECT_STATUS.md.
+
+
+עדכון מסך אישורים (15/09/2026)
+- documents מציג רק מסמכים ללא תנועה מאושרת. helper משותף לרשימה ולתור האישור, עם עימוד פנימי ובדיקת קישורים רק למסמכים שבאצווה; כל קריאה מסוננת לפי user_id.
+- פתיחת קישור אישור למסמך מאושר מובילה לתנועה עם כפתור עריכה. לא מוחקים מסמכים מאושרים, ולא יוצרים אותם מחדש דרך מסך האישור.
+- נוסף קישור מסמכים לאישור בתפריט, מצבי רשימה ברורים, כותרות בטופס, טופס כלשונית ראשונה בנייד וסרגל אישור דביק.
+- חילוץ חדש משתמש בסוג התנועה: בהכנסה הלקוח, בהוצאה הספק. שם לא ברור מוחזר ריק בציון ביטחון אפס. נתונים שכבר חולצו או אושרו לא שונו אוטומטית.
+- בדיקות אוטומטיות: סינון מאושרים, פילטרי בעלות, יותר מ־200 מסמכים, שגיאת שאילתה, והוראות שונות להכנסה ולהוצאה. לא נבדק חילוץ חי עם מסמך פרטי או ממשק בחשבון מחובר.
+- קבצים: src/lib/transactions/review-queue.ts (חדש), src/components/transactions/EditTransactionButton.tsx (חדש), src/app/(app)/documents/page.tsx, src/app/(app)/documents/[id]/review/page.tsx, src/app/(app)/transactions/[id]/page.tsx, src/components/transactions/TransactionForm.tsx, src/components/layout/nav-links.ts, src/lib/transactions/detail-actions.ts, src/lib/extraction/schema.ts, src/lib/extraction/extract-document.ts, scripts/test-transactions.cjs, PROJECT_STATUS.md.
+- פקודות: node scripts/test-transactions.cjs; npm run build. אין SQL או ספריות נוספות.
+- בדיקות ידניות: אישור מסמך והיעלמותו מהרשימה גם אחרי רענון; עריכת התנועה; פתיחת קישור אישור ישן; אישור ועבור לבא; רשימה ריקה; מסמך הכנסה עם מנפיק ולקוח שונים לעומת מסמך הוצאה; לשוניות וסרגל אישור בטלפון.

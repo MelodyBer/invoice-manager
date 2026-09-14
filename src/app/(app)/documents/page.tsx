@@ -1,80 +1,21 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { Badge, Card, EmptyState, Spinner } from "@/components/ui";
-import { formatDateDDMMYYYY, formatFileSize } from "@/lib/format";
+import { Badge, Card, EmptyState } from "@/components/ui";
+import { userContext } from "@/lib/transactions/load-range";
+import { loadReviewQueue } from "@/lib/transactions/review-queue";
+import { formatDateDDMMYYYY } from "@/lib/format";
 import type { DocumentRow, DocumentStatus } from "@/types/db";
-
-const STATUS_LABELS: Record<DocumentStatus, string> = {
-  pending: "ממתין לעיבוד",
-  processing: "בעיבוד",
-  processed: "עובד",
-  failed: "נכשל",
-};
-
-export default function DocumentsPage(): React.JSX.Element {
-  const [documents, setDocuments] = useState<DocumentRow[] | null>(null);
-
-  useEffect(() => {
-    async function loadDocuments(): Promise<void> {
-      const supabase = createClient();
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) { setDocuments([]); return; }
-      const { data } = await supabase
-        .from("documents")
-        .select("*")
-        .eq("user_id", auth.user.id)
-        .order("uploaded_at", { ascending: false });
-      setDocuments(data ?? []);
-    }
-    void loadDocuments();
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold text-foreground">מסמכים</h1>
-
-      {documents === null ? (
-        <div className="flex justify-center py-16">
-          <Spinner size={32} />
-        </div>
-      ) : documents.length === 0 ? (
-        <EmptyState
-          title="עדיין לא הועלו מסמכים"
-          description="ניתן להעלות חשבוניות וקבלות במסך העלאת מסמך."
-        />
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {documents.map((doc) => (
-            <li key={doc.id}>
-              <Card className="flex items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">{doc.file_name}</p>
-                  <p className="text-xs text-foreground/60">
-                    {formatDateDDMMYYYY(doc.uploaded_at)} · {formatFileSize(doc.file_size)} ·{" "}
-                    {STATUS_LABELS[doc.status]}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <Badge variant={doc.direction === "income" ? "income" : "expense"}>
-                    {doc.direction === "income" ? "הכנסה" : "הוצאה"}
-                  </Badge>
-                  {doc.status !== "processing" ? (
-                    <Link
-                      href={`/documents/${doc.id}/review`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      לאישור
-                    </Link>
-                  ) : null}
-                </div>
-              </Card>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+const labels: Record<DocumentStatus, string> = { pending: "ממתין לזיהוי · אפשר להזין ידנית", processing: "מזהה נתונים…", processed: "מוכן לאישור", failed: "הזיהוי נכשל · אפשר להזין ידנית" };
+export default async function DocumentsPage(): Promise<React.JSX.Element> {
+  const { supabase, userId } = await userContext();
+  let documents: DocumentRow[];
+  try { documents = await loadReviewQueue(supabase, userId); } catch { return <p role="alert">לא ניתן לטעון את רשימת האישורים. רענני ונסי שוב.</p>; }
+  const first = documents.find(document => document.status !== "processing");
+  return <div className="flex flex-col gap-5">
+    <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">מסמכים לאישור</h1><p className="mt-2 text-foreground/60">כאן מופיעים רק מסמכים שעדיין לא אושרו. לאחר אישור אפשר לצפות ולערוך דרך התנועות.</p></div><Link href="/transactions" className="text-primary underline">צפייה ועריכה בתנועות שאושרו</Link></header>
+    {documents.length === 0 ? <EmptyState title="הכול מאושר" description="אין כרגע מסמכים שממתינים לאישור." /> : <>
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-primary/5 p-4"><p>{documents.length} מסמכים ממתינים לאישור</p>{first && <Link className="rounded-lg bg-primary px-4 py-2 text-white" href={`/documents/${first.id}/review`}>התחילי לאשר</Link>}</div>
+      <ul className="flex flex-col gap-3">{documents.map(document => <li key={document.id}><Card className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-medium">{document.file_name}</p><p className="mt-1 text-sm text-foreground/60">{formatDateDDMMYYYY(document.uploaded_at)} · {labels[document.status]}</p></div><Badge variant={document.direction === "income" ? "income" : "expense"}>{document.direction === "income" ? "הכנסה" : "הוצאה"}</Badge>{document.status !== "processing" && <Link className="rounded-lg border border-border px-3 py-2 text-primary" href={`/documents/${document.id}/review`}>בדיקה ואישור</Link>}</Card></li>)}</ul>
+    </>}
+    <Link className="text-primary underline" href="/upload">העלאת מסמכים נוספים</Link>
+  </div>;
 }

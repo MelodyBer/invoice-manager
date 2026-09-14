@@ -46,7 +46,7 @@ function database(responses) {
   return { calls, from(table) {
     const trace = { table, steps: [] }; calls.push(trace);
     const query = {};
-    for (const method of ["select", "eq", "neq", "is", "gte", "lte", "order", "range", "limit", "update", "delete"])
+    for (const method of ["select", "eq", "neq", "is", "gte", "lte", "order", "range", "limit", "update", "delete", "in"])
       query[method] = (...args) => { trace.steps.push([method, ...args]); return query; };
     query.then = (resolve, reject) => Promise.resolve(responses[index++]).then(resolve, reject);
     query.maybeSingle = () => query;
@@ -112,3 +112,20 @@ const extracted = validation.applyBusinessValidation({ amount_before_vat: 100, v
 assert.equal(extracted.amount_before_vat, 120);
 assert.equal(extracted.vat_amount, 0);
 console.log("Passed: no-VAT preserves paid total, resets manual VAT, keeps category deduction at zero, supports amount edits and zero-rate extraction correction.");
+
+(async () => {
+  const { loadReviewQueue } = load("src/lib/transactions/review-queue.ts");
+  const db = database([{ data: [{ id: "approved" }, { id: "waiting" }], error: null }, { data: [{ document_id: "approved" }], error: null }]);
+  assert.deepEqual(await loadReviewQueue(db, "owner"), [{ id: "waiting" }]);
+  for (const call of db.calls) assert.ok(call.steps.some(step => step[0] === "eq" && step[1] === "user_id" && step[2] === "owner"));
+  assert.ok(db.calls[1].steps.some(step => step[0] === "eq" && step[1] === "is_verified" && step[2] === true));
+  const failed = database([{ data: [{ id: "a" }], error: null }, { data: null, error: { message: "failure" } }]);
+  await assert.rejects(() => loadReviewQueue(failed, "owner"));
+  const paged = database([{ data: Array.from({ length: 200 }, (_, i) => ({ id: String(i) })), error: null }, { data: [], error: null }, { data: [{ id: "last" }], error: null }, { data: [], error: null }]);
+  assert.equal((await loadReviewQueue(paged, "owner")).length, 201);
+  const { extractionInstruction } = load("src/lib/extraction/schema.ts");
+  assert.match(extractionInstruction("income"), /שם הלקוח/);
+  assert.match(extractionInstruction("expense"), /שם הספק/);
+  assert.notEqual(extractionInstruction("income"), extractionInstruction("expense"));
+  console.log("Passed: approved documents excluded, user isolation filters, queue pagination, errors not treated as empty, direction-aware extraction instructions.");
+})().catch(error => { console.error(error); process.exitCode = 1; });

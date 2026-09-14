@@ -66,6 +66,7 @@ export function TransactionForm({
         <DirectionToggle value={values.direction} onChange={handleDirectionChange} />
       </div>
 
+      <h2 className="border-b border-border pb-2 font-semibold">פרטי המסמך</h2>
       <Input
         id="counterparty-name"
         label={values.direction === "expense" ? "שם הספק" : "שם הלקוח"}
@@ -101,6 +102,7 @@ export function TransactionForm({
         warning={isLowConfidence(confidence, "doc_date") ? LOW_CONFIDENCE_HINT : undefined}
       />
 
+      <h2 className="mt-2 border-b border-border pb-2 font-semibold">סכומים ומע״מ</h2>
       <label className="flex items-center gap-2 rounded-lg border border-border p-3">
         <input type="checkbox" checked={withoutVat} onChange={(event) => onFieldChange({ vatRate: event.target.checked ? "0" : "18" })} />
         <span>ללא מע״מ (למשל, מסמך מעוסק פטור)</span>
@@ -165,6 +167,7 @@ export function TransactionForm({
         </p>
       ) : null}
 
+      <h2 className="mt-2 border-b border-border pb-2 font-semibold">סיווג והערות</h2>
       <Select
         id="category"
         label="קטגוריה"

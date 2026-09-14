@@ -40,7 +40,7 @@ export async function updateTransaction(id: string, values: TransactionFormValue
   const result = await supabase.from("transactions").update({ direction: values.direction, counterparty_name: values.counterpartyName.trim(), doc_number: values.docNumber.trim() || null, doc_type: values.docType, doc_date: values.docDate, amount_before_vat: Number(values.amountBeforeVat), vat_amount: Number(values.vatAmount), amount_total: Number(values.amountTotal), vat_rate: Number(values.vatRate), vat_deductible_percent: values.direction === "expense" ? values.vatDeductiblePercent : 100, category_id: values.categoryId, notes: values.notes.trim() || null }).eq("user_id", userId).eq("id", id).eq("updated_at", expectedUpdatedAt).select("id");
   if (result.error) return { error: "השמירה נכשלה. נסי שוב." };
   if (!result.data?.length) return { error: "התנועה השתנתה או נמחקה. סגרי את החלונית ופתחי אותה מחדש." };
-  revalidatePath("/transactions"); revalidatePath("/calendar");
+  revalidatePath("/transactions"); revalidatePath(`/transactions/${id}`); revalidatePath("/calendar");
   return { success: true };
 }
 export async function deleteTransaction(id: string): Promise<ActionResult> {
@@ -61,6 +61,6 @@ export async function deleteTransaction(id: string): Promise<ActionResult> {
   }
   const result = await supabase.from("transactions").delete().eq("user_id", userId).eq("id", id).select("id");
   if (result.error) return { error: "מחיקת התנועה לא הושלמה. אם צורף מסמך, ייתכן שכבר נמחק. נסי שוב." };
-  revalidatePath("/transactions"); revalidatePath("/calendar"); revalidatePath("/documents");
+  revalidatePath("/transactions"); revalidatePath(`/transactions/${id}`); revalidatePath("/calendar"); revalidatePath("/documents");
   return { success: true };
 }

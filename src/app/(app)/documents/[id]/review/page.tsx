@@ -15,7 +15,8 @@ import {
 import { findDuplicateTransactionId } from "@/lib/transactions/duplicate-check";
 import { validateTransactionValues } from "@/lib/transactions/validate-values";
 import { insertTransaction } from "@/lib/transactions/save-transaction";
-import type { CategoryRow, DocumentRow, ProfileRow } from "@/types/db";
+import { loadReviewQueue } from "@/lib/transactions/review-queue";
+import type { CategoryRow, DocumentRow } from "@/types/db";
 
 type MobileTab = "document" | "form";
 type DuplicatePendingAction = "save" | "saveAndNext" | null;
@@ -46,8 +47,9 @@ export default function DocumentReviewPage(): React.JSX.Element {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [queueIds, setQueueIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [mobileTab, setMobileTab] = useState<MobileTab>("document");
+  const [mobileTab, setMobileTab] = useState<MobileTab>("form");
   const [duplicateState, setDuplicateState] = useState<DuplicateDialogState>(EMPTY_DUPLICATE_STATE);
 
   const form = useTransactionForm(useMemo(() => EMPTY_FORM_VALUES, []));
@@ -57,40 +59,27 @@ export default function DocumentReviewPage(): React.JSX.Element {
 
     async function load(): Promise<void> {
       setIsLoading(true);
+      setLoadError("");
+      setMobileTab("form");
 
       const { data: userData } = await supabase.auth.getUser();
       const currentUserId = userData.user?.id ?? null;
       if (!currentUserId) { router.replace("/login"); return; }
 
-      const [
-        { data: documentData },
-        { data: categoriesData },
-        { data: processedDocs },
-        { data: linkedTransactions },
-      ] = await Promise.all([
+      const [documentResult, categoriesResult, profileResult, pendingDocs, existing] = await Promise.all([
         supabase.from("documents").select("*").eq("user_id", currentUserId).eq("id", documentId).single(),
         supabase.from("categories").select("*").eq("user_id", currentUserId).order("name"),
-        supabase
-          .from("documents")
-          .select("id, uploaded_at")
-          .eq("user_id", currentUserId)
-          .in("status", ["pending", "processed", "failed"])
-          .order("uploaded_at", { ascending: true }),
-        supabase.from("transactions").select("document_id").eq("user_id", currentUserId).not("document_id", "is", null),
+        supabase.from("profiles").select("*").eq("id", currentUserId).single(),
+        loadReviewQueue(supabase, currentUserId),
+        supabase.from("transactions").select("id").eq("user_id", currentUserId).eq("document_id", documentId).eq("is_verified", true).limit(1).maybeSingle(),
       ]);
-
-      const { data: profileData }: { data: ProfileRow | null } = currentUserId
-        ? await supabase.from("profiles").select("*").eq("id", currentUserId).single()
-        : { data: null };
-
-      if (isCancelled) {
-        return;
-      }
-
-      const linkedIds = new Set((linkedTransactions ?? []).map((row) => row.document_id));
-      const queue = (processedDocs ?? [])
-        .filter((doc) => !linkedIds.has(doc.id))
-        .map((doc) => doc.id);
+      if (isCancelled) return;
+      if (documentResult.error || categoriesResult.error || profileResult.error || existing.error) throw new Error("טעינת המסמך נכשלה");
+      if (existing.data) { router.replace(`/transactions/${existing.data.id}`); return; }
+      const documentData = documentResult.data;
+      const categoriesData = categoriesResult.data;
+      const profileData = profileResult.data;
+      const queue = pendingDocs.filter(document => document.status !== "processing").map(document => document.id);
 
       setUserId(currentUserId);
       setDocumentRow(documentData ?? null);
@@ -110,7 +99,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
       setIsLoading(false);
     }
 
-    void load();
+    void load().catch(() => { if (!isCancelled) { setLoadError("לא ניתן לטעון את המסמך. רענני ונסי שוב."); setIsLoading(false); } });
 
     return () => {
       isCancelled = true;
@@ -140,7 +129,9 @@ export default function DocumentReviewPage(): React.JSX.Element {
       return;
     }
     setIsSaving(true);
-    const { errorMessage } = await insertTransaction(supabase, userId, documentId, form.values);
+    let errorMessage: string | null;
+    try { ({ errorMessage } = await insertTransaction(supabase, userId, documentId, form.values)); }
+    catch { errorMessage = "השמירה נכשלה. בדקי את החיבור ונסי שוב."; }
     setIsSaving(false);
 
     if (errorMessage) {
@@ -148,10 +139,11 @@ export default function DocumentReviewPage(): React.JSX.Element {
       return;
     }
 
-    showToast("התנועה נשמרה בהצלחה");
+    showToast("המסמך אושר ונשמר בתנועות");
+    router.refresh();
 
     if (andNext) {
-      const nextId = currentIndex !== -1 ? queueIds[currentIndex + 1] : undefined;
+      const nextId = currentIndex !== -1 ? queueIds[currentIndex + 1] ?? queueIds.find(id => id !== documentId) : undefined;
       router.push(nextId ? `/documents/${nextId}/review` : "/documents");
     } else {
       router.push("/documents");
@@ -205,6 +197,8 @@ export default function DocumentReviewPage(): React.JSX.Element {
     );
   }
 
+  if (loadError) return <p role="alert">{loadError}</p>;
+
   if (!documentRow) {
     return <EmptyState title="המסמך לא נמצא" description="ייתכן שהוא נמחק או שאין לך הרשאה לצפות בו." />;
   }
@@ -218,16 +212,19 @@ export default function DocumentReviewPage(): React.JSX.Element {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">אישור מסמך</h1>
         <Link href="/documents" className="text-sm text-primary hover:underline">
-          חזרה לרשימת המסמכים
+          חזרה לממתינים לאישור
         </Link>
       </div>
+
+      <p className="text-sm text-foreground/60">בדקי את הפרטים מול המסמך. שדות בצהוב דורשים תשומת לב. לאחר האישור המסמך יעבור לתנועות.</p>
+      <p className="truncate font-medium">{documentRow.file_name}</p>
 
       {queuePosition ? (
         <div className="flex items-center justify-center gap-4">
           <button
             type="button"
             onClick={goToPrevious}
-            disabled={currentIndex <= 0}
+            disabled={isSaving || currentIndex <= 0}
             aria-label="מסמך קודם"
             className="rounded-lg border border-border px-2 py-1 text-sm text-foreground hover:bg-foreground/5 disabled:opacity-40"
           >
@@ -239,7 +236,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
           <button
             type="button"
             onClick={goToNext}
-            disabled={currentIndex === -1 || currentIndex >= queueIds.length - 1}
+            disabled={isSaving || currentIndex === -1 || currentIndex >= queueIds.length - 1}
             aria-label="מסמך הבא"
             className="rounded-lg border border-border px-2 py-1 text-sm text-foreground hover:bg-foreground/5 disabled:opacity-40"
           >
@@ -265,12 +262,13 @@ export default function DocumentReviewPage(): React.JSX.Element {
             mobileTab === "form" ? "bg-primary text-white" : "border border-border text-foreground"
           }`}
         >
-          טופס
+          פרטים לאישור
         </button>
       </div>
 
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className={mobileTab === "form" ? "block" : "hidden lg:block"}>
+          <fieldset disabled={isSaving}>
           <TransactionForm
             values={form.values}
             onFieldChange={form.setField}
@@ -278,13 +276,14 @@ export default function DocumentReviewPage(): React.JSX.Element {
             confidence={confidence}
             isVatManuallyEdited={form.isVatManuallyEdited}
           />
+          </fieldset>
         </div>
-        <div className={mobileTab === "document" ? "block" : "hidden lg:block"}>
+        <div className={mobileTab === "document" ? "block lg:sticky lg:top-4" : "hidden lg:sticky lg:top-4 lg:block"}>
           <DocumentViewer key={documentRow.id} storagePath={documentRow.storage_path} mimeType={documentRow.mime_type} />
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 border-t border-border bg-background p-4 shadow-lg">
         <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving}>
           אשר ושמור
         </Button>
