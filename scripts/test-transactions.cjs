@@ -160,3 +160,19 @@ assert.equal(documentsMayMatch({...invoice,extraction_raw:{...invoice.extraction
  assert.ok((await insertTransaction(failed,"owner","document",values)).errorMessage);
  console.log("Passed: document approval uses one atomic RPC and reports failure without fallback insert.");
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+const { approvedDocument } = load("src/lib/transactions/document-matching.ts");
+const oldInvoice={...invoice,extraction_raw:{...invoice.extraction_raw,counterparty_name:"זיהוי שגוי",amount_total:999}};
+const savedInvoice={id:"saved",user_id:"owner",document_id:"invoice",is_verified:true,direction:"expense",doc_type:"invoice_tax",counterparty_name:invoice.extraction_raw.counterparty_name,doc_date:"2026-09-01",amount_total:118,amount_before_vat:100,vat_amount:18,vat_rate:18,currency:"ILS",updated_at:"version"};
+assert.equal(documentsMayMatch(receipt,oldInvoice),false);
+assert.equal(documentsMayMatch(receipt,approvedDocument(oldInvoice,savedInvoice)),true);
+assert.equal(approvedDocument(oldInvoice,{...savedInvoice,user_id:"other"}),oldInvoice);
+(async()=>{
+ const db=database([{data:receipt,error:null},{data:savedInvoice,error:null},{data:oldInvoice,error:null}]);
+ const actions=load("src/lib/transactions/pair-actions.ts",{"next/cache":{revalidatePath(){}},"./load-range":{userContext:async()=>({supabase:db,userId:"owner"})}});
+ const result=await actions.resolveInvoiceDuplicate("receipt","saved");
+ assert.equal(result.candidate.transaction.id,"saved");
+ assert.equal(result.candidate.document.extraction_raw.amount_total,118);
+ for(const call of db.calls) assert.ok(call.steps.some(step=>step[0]==="eq"&&step[1]==="user_id"&&step[2]==="owner"));
+ console.log("Passed: corrected approved invoice used for matching; duplicate receipt resolves to existing transaction with owner filtering.");
+})().catch(error=>{console.error(error);process.exitCode=1;});

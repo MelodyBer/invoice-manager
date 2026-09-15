@@ -1,4 +1,4 @@
-import type { DocumentRow } from "@/types/db";
+import type { DocumentRow, TransactionRow } from "@/types/db";
 import { validDate } from "./reporting";
 function normalized(value: unknown): string { return typeof value === "string" ? value.normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "").toLowerCase() : ""; }
 export function documentsMayMatch(a: DocumentRow, b: DocumentRow): boolean {
@@ -15,4 +15,10 @@ export function documentsMayMatch(a: DocumentRow, b: DocumentRow): boolean {
  const invoice=x.doc_type==="invoice_tax"?x:y, receipt=x.doc_type==="receipt"?x:y;
  const gap=(Date.parse(String(receipt.doc_date))-Date.parse(String(invoice.doc_date)))/86400000;
  return gap>=0 && gap<=90;
+}
+
+
+export function approvedDocument(document: DocumentRow, transaction: TransactionRow | null): DocumentRow {
+ if (!transaction || !transaction.is_verified || transaction.document_id !== document.id || transaction.user_id !== document.user_id) return document;
+ return {...document, direction:transaction.direction, extraction_raw:{...document.extraction_raw,counterparty_name:transaction.counterparty_name,business_number:null,doc_type:transaction.doc_type,doc_number:transaction.doc_number,doc_date:transaction.doc_date,amount_total:transaction.amount_total,amount_before_vat:transaction.amount_before_vat,vat_amount:transaction.vat_amount,vat_rate:transaction.vat_rate,currency:transaction.currency}};
 }

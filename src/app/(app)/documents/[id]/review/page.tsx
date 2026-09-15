@@ -1,7 +1,7 @@
 "use client";
 
 import { RemoveReviewDocument } from "@/components/documents/RemoveReviewDocument";
-import { findDocumentPairs, approveDocumentPair, type PairCandidate } from "@/lib/transactions/pair-actions";
+import { findDocumentPairs, approveDocumentPair, resolveInvoiceDuplicate, type PairCandidate } from "@/lib/transactions/pair-actions";
 import { formatDateDDMMYYYY } from "@/lib/format";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -194,6 +194,26 @@ export default function DocumentReviewPage(): React.JSX.Element {
     } catch { showToast("לא ניתן לבדוק כפילויות. נסי שוב.", "error"); return; }
     finally { setIsSaving(false); }
 
+    if (existingId && existingId !== pair?.transaction?.id && !pair) {
+      setIsSaving(true);
+      try {
+        const match = await resolveInvoiceDuplicate(documentId, existingId);
+        if (match.error) { showToast(match.error, "error"); return; }
+        if (match.candidate) {
+          const candidate = match.candidate;
+          setPairs(current => current.some(item => item.document.id === candidate.document.id) ? current : [...current, candidate]);
+          selectPair(candidate);
+          showToast("נמצאה חשבונית מאושרת מתאימה. בדקי את החיבור ולחצי שוב לאישור; הסכום יישמר פעם אחת.");
+          window.scrollTo({top:0,behavior:"smooth"});
+          return;
+        }
+        if (match.invoiceExists) {
+          showToast("קיימת חשבונית מס, אך אין התאמה בטוחה לצירוף הקבלה. בדקי את הסכום, השם והתאריך לפני שמירה כתנועה נוספת.", "error");
+          return;
+        }
+      } catch { showToast("בדיקת החשבונית נכשלה. נסי שוב.", "error"); return; }
+      finally { setIsSaving(false); }
+    }
     if (existingId && existingId !== pair?.transaction?.id) {
       setDuplicateState({
         isOpen: true,
