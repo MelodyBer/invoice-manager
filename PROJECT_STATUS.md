@@ -86,3 +86,53 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - בדיקות ידניות אחרי פרסום: 1. חשבונית 118 וקבלה 118 מאותו צד — אישור משותף, תנועה אחת בסך 118 ושני מצורפים; שניהם יוצאים מהתור. 2. קבלה שמגיעה אחרי אישור החשבונית — צירוף ללא שינוי סכומים או ספירה נוספת. 3. חשבונית לאחר אישור קבלה — בדיקה ואישור עדכון התנועה הקיימת. 4. צד או מטבע אחר/סכום חלקי — אין הצעת חיבור. 5. ביטול חיבור ועסקה נפרדת במפורש. 6. ביטול הסרה לעומת אישור הסרה ורענון; הקובץ נשמר. 7. ניסיון מקביל בשתי לשוניות או שינוי תנועה לפני אישור — אין תנועה כפולה. 8. חשבון שני לא רואה ולא מחבר מסמכים של הראשון. 9. כל התהליך בטלפון.
 
 תיקון קבלה מול חשבונית מאושרת: בדיקת התאמה משתמשת בשדות התנועה שאושרו במקום נתוני חילוץ ישנים. נוסף חיפוש חשבוניות מאושרות לפי תאריכי התנועה; התרעת כפילות נבדקת להצעת צירוף לפני הצגת אפשרות שמירה נוספת. חיבור דורש אישור חוזר ושומר את סכומי החשבונית. שגיאת התאמה אינה עוקפת כפילות. אין SQL חדש. קבצים: src/lib/transactions/document-matching.ts, src/lib/transactions/pair-actions.ts, src/app/(app)/documents/[id]/review/page.tsx, scripts/test-transactions.cjs, PROJECT_STATUS.md. בדיקה ידנית: קבלה מול חשבונית שנערכה באישור, אישור הצירוף, תנועה אחת ושני קבצים.
+
+## עדכון מטבע וצירוף קבלה — מוכן להפעלה לאחר migration_4
+- כל הקוד נמצא בענף currency-and-receipt-linking. אין לפרסם את הענף לפני הרצת supabase/migration_4_currency.sql לאחר migration_3 שכבר הותקן. הגרסה החיה נשארת f9b1bd9.
+- מטבע מקורי הוא ILS או USD. סכומי transactions.amount_before_vat / vat_amount / amount_total נשארים בשקלים; original_amount_* שומרים את מטבע המקור. amount_total_usd שומר את הערך בדולרים גם למסמך שקלי. כל הסכומים numeric(12,2), השער numeric(18,8).
+- exchange_rate הוא תמיד מספר השקלים לדולר אמריקאי, גם עבור מסמך שמטבעו שקל. exchange_rate_date הוא יום פרסום השער בפועל. documents.valuation_date שומר את תאריך המסמך שהניע את ההמרה. documents.verified_doc_type ו-verified_counterparty_name שומרים נתונים שאושרו בלי לשכתב extraction_raw.
+- מקור השערים: https://www.boi.org.il/information/bank-paymnts/guide/api-guide/ ; סדרה RER_USD_ILS בממשק SDMX הרשמי. נבדקה בקשת רשת אמיתית לטווח 01–08/02/2026, והשער ל־06/02/2026 היה 3.125. קובץ CSV נפרס ללא ספרייה נוספת. בוחרים רק שער מתאריך המסמך או מוקדם ממנו, לא שער עתידי. תאריך עתידי או לפני 2020 נדחה.
+- getBoiRate בשרת בלבד; מתאריך תחילה של 30 יום אחורה ומרחיב חיפוש אם אין נתונים. מטמון fetch ציבורי לפי כתובת ותאריך (ללא מידע משתמשים). בשגיאת רשת אין שער משוער ואין שמירה. הבנק מקבל רק טווח תאריכים, לא מסמכים ולא שמות.
+- החישוב משתמש באגורות וב-BigInt כדי לעגל המרות. סכום כולל ולפני מע"מ מומרים ומע"מ בשקלים הוא ההפרש כדי לשמור על איזון. הסכומים המקוריים נשמרים בנפרד.
+- RPC חדש save_financial_record עם SECURITY INVOKER, RLS ו-auth.uid, נעילת מסמכים, בדיקת בעלות וגרסת updated_at. חיבור מסמך ויצירה/עדכון של תנועה מתבצעים באותה טרנזקציה. פקודות העדכון הישנות נשמרות למסד הקיים אך קוד האפליקציה עבר למסלול החדש. אין שינוי מפתחות או Service Role.
+- ReceiptAttachment מציג חיפוש של עד 20 חשבוניות מאושרות לפי ספק או מספר; לכל אחת כפתור 'צרף קבלה לחשבונית' שפותח דיאלוג עם פרטי שני המסמכים והמרותיהם. 'אשר צירוף' מבצע בפועל את החיבור. ניתן לאשר במפורש גם מסמכים במטבעות או סכומים שונים, ללא ניחוש אוטומטי שהם שייכים לאותה עסקה. צירוף לחשבונית קיימת אינו משנה את סכומי החשבונית. קבלה שאושרה קודם ואחריה חשבונית עדיין ניתנות לאישור משותף דרך תור ההתאמות.
+- רשומות ישנות שמסומנות USD או שהמסמך שלהן זוהה כמטבע אחר, ונשמרו ללא שער, מסומנות currency_review_required. המספרים הישנים לא מומרים אוטומטית. הרשומות נשארות גלויות לעריכה אך אינן נכללות בסיכומים עד לשמירה מחדש. בעריכה שומרים שם, מספר, קטגוריה והערות שתוקנו קודם, וטוענים את הסכומים המקוריים מהחילוץ לבדיקה. למסמכי שקל ישנים ללא שער מופיעה הודעה שהערך בדולר טרם חושב.
+- חילוץ מודע לדולר ולשקל. לא ממיר מטבע במודל; אינו מניח 18% במסמך דולרי ללא פירוט מס, ומוסיף הערה לבדיקת המס. מטבעות אחרים אינם נשמרים עד בחירת מטבע נתמך.
+- אין ספריות נוספות ואין שינוי בהעלאת הקבצים.
+- אימות שבוצע: node scripts/test-currency.cjs ; node scripts/test-transactions.cjs ; npm run build — עברו. בדיקות כוללות סוף שבוע ללא שער, שורות CSV עתידיות, USD/ILS, עיגול, מע"מ אפס, תאריכים שונים לכל מסמך, צירוף בלי עדכון סכום החשבונית, סינון בעלות, שגיאת שער ושגיאת גרסה. בדיקות בסיס נתונים מלאות תחת RLS, ה-RPC החדש על PostgreSQL ותהליך דפדפן מחובר טרם בוצעו; אין סביבת PostgreSQL מקומית.
+- לפני פרסום: להריץ migration_4_currency.sql פעם אחת ב-Supabase SQL Editor, לא schema.sql. לוודא שהעמודות ופונקציית save_financial_record זמינות (ללא קריאת מידע פרטי), למזג לענף main, לדחוף ולפרסם ב-Vercel לפי ההרשאה הקיימת.
+- בדיקות ידניות: (1) מסמך 100 דולר ללא מע"מ, 08/02/2026 — שער 06/02/2026, 3.125, סה"כ 312.50 ₪ ו־100 $. (2) מסמך 312.50 ₪ באותו תאריך — נשאר 312.50 ₪ ומוצג גם 100 $. (3) חשבונית וקבלה בתאריכים/מטבעות שונים — בדיקת שני שערים, אישור צירוף ותנועה אחת ללא שינוי הסכום המקורי. (4) כשל שירות שערים — השמירה נעצרת, אין תנועה חלקית. (5) עריכת תאריך או מטבע — חישוב מחדש ושמירה; פתיחה מחדש מציגה אותו שער שנשמר. (6) תיקון רשומה ישנה שסומנה לבדיקה — חוזרת לסיכומים רק לאחר שמירה. (7) חשבון אחר לא יכול לצפות או לצרף מסמך שאינו שלו. (8) חיפוש, פתיחת דיאלוג, ביטול ואישור צירוף בנייד.
+
+קבצים שנוצרו או שונו בשלב זה:
+- PROJECT_STATUS.md
+- scripts/test-currency.cjs
+- scripts/test-transactions.cjs
+- src/app/(app)/calendar/page.tsx
+- src/app/(app)/documents/[id]/review/page.tsx
+- src/app/(app)/transactions/[id]/page.tsx
+- src/app/(app)/transactions/page.tsx
+- src/components/documents/ReceiptAttachment.tsx
+- src/components/transactions/CurrencyPreview.tsx
+- src/components/transactions/MoneySummary.tsx
+- src/components/transactions/TransactionDrawer.tsx
+- src/components/transactions/TransactionForm.tsx
+- src/components/transactions/TransactionResults.tsx
+- src/lib/currency/actions.ts
+- src/lib/currency/boi.ts
+- src/lib/currency/money.ts
+- src/lib/extraction/parse-result.ts
+- src/lib/extraction/schema.ts
+- src/lib/transactions/attach-receipt.ts
+- src/lib/transactions/build-initial-values.ts
+- src/lib/transactions/detail-actions.ts
+- src/lib/transactions/document-matching.ts
+- src/lib/transactions/financial-actions.ts
+- src/lib/transactions/financial-server.ts
+- src/lib/transactions/form-from-transaction.ts
+- src/lib/transactions/pair-actions.ts
+- src/lib/transactions/reporting.ts
+- src/lib/transactions/save-transaction.ts
+- src/lib/transactions/validate-values.ts
+- src/types/db.ts
+- src/types/transaction-form.ts
+- supabase/migration_4_currency.sql

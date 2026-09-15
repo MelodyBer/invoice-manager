@@ -1,6 +1,7 @@
 import type { Direction, DocType } from "@/types/db";
 
 export interface TransactionFormValues {
+  currency: string;
   direction: Direction;
   counterpartyName: string;
   docNumber: string;

@@ -19,6 +19,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const initial = { ...range, direction, category, q }; const base = new URLSearchParams(initial); base.set("sort", sort); base.set("order", ascending ? "asc" : "desc");
   const pageUrl = (number: number): string => { const query = new URLSearchParams(base); query.set("page", String(number)); return `/transactions?${query}`; };
   return <div className="flex min-w-0 flex-col gap-4"><header className="flex items-center justify-between"><h1 className="text-2xl font-bold">תנועות</h1><Link className="rounded bg-primary px-4 py-2 text-white" href="/transactions/new">תנועה חדשה</Link></header>
+    {rows.some(row=>row.currency_review_required)&&<p role="alert" className="rounded border border-warning p-3">יש תנועות ישנות שדורשות בדיקת מטבע. הן מסומנות ברשימה ואינן נכללות בסיכומים עד לשמירה מחדש בעריכה.</p>}
     <TransactionFilters key={base.toString()} initial={initial} categories={categories} />
     <p className="text-sm text-foreground/70">{formatDateDDMMYYYY(range.start)} – {formatDateDDMMYYYY(range.end)} · {results.count} תנועות מאושרות. יתרת המע״מ היא מע״מ הכנסות פחות מע״מ הוצאות לפי אחוז ההכרה.</p>
     <TransactionResults key={base.toString() + page} rows={results.rows} categories={names} totals={totals} sort={sort} ascending={ascending} sortBase={base.toString()} />

@@ -1,6 +1,8 @@
 import type { TransactionFormValues } from "@/types/transaction-form";
 
 export function validateTransactionValues(values: TransactionFormValues): string | null {
+  if (!values || typeof values !== "object" || [values.currency,values.counterpartyName,values.docNumber,values.docDate,values.amountBeforeVat,values.vatAmount,values.amountTotal,values.vatRate,values.notes].some(value=>typeof value!=="string")) return "נתוני הטופס אינם תקינים.";
+  if (!["ILS", "USD"].includes(values.currency)) return "יש לבחור מטבע: שקל או דולר אמריקאי.";
   if (!values.counterpartyName.trim()) return "יש למלא שם ספק או לקוח.";
   const date = new Date(`${values.docDate}T12:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(values.docDate) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== values.docDate) return "יש לבחור תאריך תקין.";

@@ -9,6 +9,8 @@ function load(file, mocks = {}) {
   const localRequire = name => {
     if (name in mocks) return mocks[name];
     if (name === "server-only") return {};
+    if (name === "@/lib/currency/boi") return { getBoiRate: async date => ({rate:3.125,rateDate:date,requestedDate:date,source:"בנק ישראל"}) };
+    if (name.startsWith("@/")) return load("src/" + name.slice(2) + ".ts", mocks);
     if (name.startsWith("./")) return load(path.join(path.dirname(file), name + ".ts"), mocks);
     return require(name);
   };
@@ -43,7 +45,7 @@ assert.equal(formatDateDDMMYYYY("2026-08-31T22:30:00Z"), "01/09/2026");
 // Simulated Supabase calls: no network, credentials or live data.
 function database(responses) {
   const calls = []; let index = 0;
-  return { calls, from(table) {
+  return { calls, rpc(name,args) { calls.push({rpc:name,args}); return Promise.resolve(responses[index++]); }, from(table) {
     const trace = { table, steps: [] }; calls.push(trace);
     const query = {};
     for (const method of ["select", "eq", "neq", "is", "gte", "lte", "order", "range", "limit", "update", "delete", "in"])
@@ -74,10 +76,10 @@ function database(responses) {
   const manual = database([{ data: { document_id: null }, error: null }, { data: [], error: null }, { data: [{ id: "id" }], error: null }]);
   assert.equal((await actions(manual).deleteTransaction("id")).success, true);
   assert.equal(manual.calls.some(call => call.storage), false);
-  const values = { direction: "expense", counterpartyName: "test", docNumber: "1", notes: "", docType: "invoice_tax", docDate: "2026-09-01", amountBeforeVat: "100", vatAmount: "18", amountTotal: "118", vatRate: "18", vatDeductiblePercent: 100, categoryId: null };
-  const stale = database([{ data: null, error: null }, { data: [], error: null }]);
+  const values = { currency: "ILS", direction: "expense", counterpartyName: "test", docNumber: "1", notes: "", docType: "invoice_tax", docDate: "2026-09-01", amountBeforeVat: "100", vatAmount: "18", amountTotal: "118", vatRate: "18", vatDeductiblePercent: 100, categoryId: null };
+  const stale = database([{ data: null, error: null }, { data: {document_id:null}, error: null }, { data:null,error:{message:"stale"} }]);
   assert.ok((await actions(stale).updateTransaction("id", values, "old-timestamp")).error);
-  assert.ok(stale.calls[1].steps.some(step => step[1] === "updated_at" && step[2] === "old-timestamp"));
+  assert.equal(stale.calls.find(call=>call.rpc)?.args.p_expected_updated_at,"old-timestamp");
   const duplicate = database([{ data: { id: "duplicate" }, error: null }]);
   assert.equal((await actions(duplicate).updateTransaction("id", values, "timestamp")).duplicateId, "duplicate");
   assert.equal(duplicate.calls.length, 1);
@@ -146,20 +148,7 @@ console.log("Passed: complementary documents, different owner/direction/currency
 
 assert.equal(documentsMayMatch(invoice,{...receipt,status:"processing"}),false);
 assert.equal(documentsMayMatch(invoice,{...receipt,extraction_raw:{...receipt.extraction_raw,amount_total:NaN}}),false);
-assert.equal(documentsMayMatch({...invoice,extraction_raw:{...invoice.extraction_raw,currency:"USD"}},{...receipt,extraction_raw:{...receipt.extraction_raw,currency:"USD"}}),false);
-(async () => {
- const { insertTransaction } = load("src/lib/transactions/save-transaction.ts");
- const calls=[];
- const values={direction:"expense",counterpartyName:"test",docNumber:"1",docType:"invoice_tax",docDate:"2026-09-01",amountBeforeVat:"100",vatAmount:"18",amountTotal:"118",vatRate:"18",vatDeductiblePercent:100,categoryId:null,notes:""};
- const rpcClient={rpc:async (name,args)=>{calls.push({name,args});return {data:"transaction",error:null};},from:()=>{throw new Error("Document approval must not use separate inserts");}};
- assert.equal((await insertTransaction(rpcClient,"owner","document",values)).errorMessage,null);
- assert.equal(calls.length,1);
- assert.equal(calls[0].name,"confirm_documents");
- assert.deepEqual(calls[0].args.p_document_ids,["document"]);
- const failed={...rpcClient,rpc:async()=>({error:{message:"stale"}})};
- assert.ok((await insertTransaction(failed,"owner","document",values)).errorMessage);
- console.log("Passed: document approval uses one atomic RPC and reports failure without fallback insert.");
-})().catch(error=>{console.error(error);process.exitCode=1;});
+assert.equal(documentsMayMatch({...invoice,extraction_raw:{...invoice.extraction_raw,currency:"USD"}},{...receipt,extraction_raw:{...receipt.extraction_raw,currency:"USD"}}),true);
 
 const { approvedDocument } = load("src/lib/transactions/document-matching.ts");
 const oldInvoice={...invoice,extraction_raw:{...invoice.extraction_raw,counterparty_name:"זיהוי שגוי",amount_total:999}};

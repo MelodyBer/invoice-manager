@@ -3,8 +3,10 @@ import { revalidatePath } from "next/cache";
 import { userContext } from "./load-range";
 import { validDate } from "./reporting";
 import { documentsMayMatch, approvedDocument } from "./document-matching";
-import { validateTransactionValues } from "./validate-values";
-import { transactionPayload } from "./transaction-payload";
+import { prepareFinancialValues, documentFinancialValues } from "./financial-server";
+import { buildInitialValuesFromExtraction } from "./build-initial-values";
+import { formFromTransaction } from "./form-from-transaction";
+import { attachReceipt } from "./attach-receipt";
 import type { TransactionFormValues } from "@/types/transaction-form";
 import type { DocumentRow, TransactionRow } from "@/types/db";
 export type PairCandidate = { document: DocumentRow; transaction: TransactionRow | null };
@@ -44,29 +46,39 @@ export async function findDocumentPairs(id: string): Promise<{ candidates: PairC
      const query=supabase.from("transactions").select("*").eq("user_id",userId);
      const linked=document.transaction_id ? await query.eq("id",document.transaction_id).maybeSingle() : await query.eq("document_id",document.id).limit(1).maybeSingle();
      if(linked.error) return {candidates:[],error:"לא ניתן לבדוק את התנועה המקושרת."};
+     if(linked.data && linked.data.document_id!==document.id) continue;
      const effective=approvedDocument(document,linked.data);
      if(documentsMayMatch(source.data,effective) && !candidates.some(candidate=>candidate.document.id===document.id)) candidates.push({document:effective,transaction:linked.data});
    }
    if((batch.data ?? []).length<200) return {candidates};
  }
 }
-export async function approveDocumentPair(id: string, otherId: string, values: TransactionFormValues, expectedUpdatedAt: string | null): Promise<{errorMessage: string | null}> {
- const error=validateTransactionValues(values); if(error) return {errorMessage:error};
+export async function approveDocumentPair(id:string,otherId:string,values:TransactionFormValues,expectedUpdatedAt:string|null,sourceValues?:TransactionFormValues):Promise<{errorMessage:string|null}> {
  const {supabase,userId}=await userContext();
  const result=await supabase.from("documents").select("*").eq("user_id",userId).in("id",[id,otherId]);
- if(result.error || result.data?.length!==2) return {errorMessage:"לא ניתן לטעון את המסמכים לחיבור."};
- const effective: DocumentRow[]=[];
- for(const document of result.data) {
-   const query=supabase.from("transactions").select("*").eq("user_id",userId);
-   const linked=document.transaction_id ? await query.eq("id",document.transaction_id).maybeSingle() : await query.eq("document_id",document.id).limit(1).maybeSingle();
-   if(linked.error) return {errorMessage:"לא ניתן לבדוק את התנועה הקיימת."};
-   effective.push(approvedDocument(document,linked.data));
+ if(result.error || result.data?.length!==2)return {errorMessage:"לא ניתן לטעון את המסמכים לחיבור."};
+ const source=result.data.find(document=>document.id===id)!;
+ const other=result.data.find(document=>document.id===otherId)!;
+ const original=sourceValues??buildInitialValuesFromExtraction(source.direction,source.extraction_raw,null);
+ const primaryId=original.docType==="invoice_tax"?id:otherId;
+ const receiptId=primaryId===id?otherId:id;
+ let receiptValues=receiptId===id?original:buildInitialValuesFromExtraction(other.direction,other.extraction_raw,null);
+ const linkedResult=await supabase.from("transactions").select("*").eq("user_id",userId).or(`document_id.in.(${id},${otherId})`);
+ if(linkedResult.error || (linkedResult.data??[]).length>1)return {errorMessage:"כבר קיימות תנועות נפרדות למסמכים. אין לאחד בלי בדיקה."};
+ const existing=linkedResult.data?.[0];
+ if(existing?.doc_type==="receipt")receiptValues=formFromTransaction(existing);
+ if(existing?.doc_type==="invoice_tax") {
+   const response=await attachReceipt(receiptId,existing.id,expectedUpdatedAt??"",receiptValues);
+   return {errorMessage:response.error??null};
  }
- if(!documentsMayMatch(effective[0],effective[1])) return {errorMessage:"המסמכים אינם מתאימים לחיבור. רענני ובדקי אותם."};
- const {error:saveError}=await supabase.rpc("confirm_documents",{p_document_ids:[id,otherId],p_values:transactionPayload(values),p_expected_updated_at:expectedUpdatedAt ?? undefined});
- if(saveError) return {errorMessage:"החיבור לא נשמר. ייתכן שמסמך כבר אושר או השתנה. רענני ובדקי; לא נוצר חיבור חלקי."};
- revalidatePath("/documents"); revalidatePath("/transactions"); revalidatePath("/calendar");
- return {errorMessage:null};
+ if(values.docType!=="invoice_tax"||receiptValues.docType!=="receipt"||values.direction!==receiptValues.direction)return {errorMessage:"יש לבחור חשבונית מס וקבלה מאותו סוג תנועה."};
+ try {
+   const [invoiceMoney,receiptMoney]=await Promise.all([prepareFinancialValues(values),prepareFinancialValues(receiptValues)]);
+   const saved=await supabase.rpc("save_financial_record",{p_values:{...invoiceMoney,document_id:primaryId},p_document_values:{[primaryId]:documentFinancialValues(values,invoiceMoney),[receiptId]:documentFinancialValues(receiptValues,receiptMoney)},p_transaction_id:existing?.id,p_expected_updated_at:expectedUpdatedAt??undefined});
+   if(saved.error)return {errorMessage:"החיבור לא נשמר. רענני ובדקי אם מסמך כבר אושר או השתנה."};
+   revalidatePath("/documents");revalidatePath("/transactions");revalidatePath("/calendar");
+   return {errorMessage:null};
+ }catch(error){return {errorMessage:error instanceof Error?error.message:"חישוב המטבע נכשל."};}
 }
 export async function dismissDocument(id: string): Promise<{error?:string}> {
  const {supabase}=await userContext();

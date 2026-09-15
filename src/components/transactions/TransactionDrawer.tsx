@@ -1,4 +1,7 @@
 "use client";
+import { MoneySummary } from "./MoneySummary";
+import { formFromTransaction } from "@/lib/transactions/form-from-transaction";
+import { buildInitialValuesFromExtraction } from "@/lib/transactions/build-initial-values";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -25,7 +28,11 @@ export function TransactionDrawer({ id, onClose }: { id: string; onClose: () => 
       if (!result.detail) { setError(result.error ?? "לא ניתן לטעון את התנועה."); return; }
       setDetail(result.detail);
       const t = result.detail.transaction;
-      resetTo({ direction: t.direction, counterpartyName: t.counterparty_name, docNumber: t.doc_number ?? "", docType: t.doc_type, docDate: t.doc_date, amountBeforeVat: String(t.amount_before_vat), vatAmount: String(t.vat_amount), amountTotal: String(t.amount_total), vatRate: String(t.vat_rate), vatDeductiblePercent: t.vat_deductible_percent, categoryId: t.category_id, notes: t.notes ?? "" });
+      const initial = formFromTransaction(t);
+      if (t.currency_review_required && result.detail.document) {
+        const extracted = buildInitialValuesFromExtraction(t.direction,result.detail.document.extraction_raw,null);
+        resetTo({...initial,currency:extracted.currency,amountBeforeVat:extracted.amountBeforeVat,vatAmount:extracted.vatAmount,amountTotal:extracted.amountTotal,vatRate:extracted.vatRate});
+      } else resetTo(initial);
     }).catch(() => { if (active) setError("לא ניתן לטעון את התנועה. בדקי את החיבור לרשת."); });
     return () => { active = false; };
   }, [id, resetTo]);
@@ -50,10 +57,11 @@ export function TransactionDrawer({ id, onClose }: { id: string; onClose: () => 
     {error && <p role="alert" className="mb-4 rounded border border-expense p-3 text-expense">{error}</p>}
     {!detail && !error && <Spinner />}
     {detail && <>
+      <MoneySummary value={detail.transaction} date={detail.transaction.doc_date} needsReview={detail.transaction.currency_review_required} />
       {editing ? <fieldset disabled={busy}><TransactionForm values={form.values} onFieldChange={form.setField} categories={detail.categories} confidence={null} isVatManuallyEdited={form.isVatManuallyEdited} /></fieldset> : <dl className="grid grid-cols-2 gap-3">{fields.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-sm text-foreground/60">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl>}
       {duplicateId && <section role="alert" className="my-4 rounded border border-warning p-3"><p>נראה שהמסמך הזה כבר קיים במערכת</p><Link className="text-primary underline" href={`/transactions/${duplicateId}`}>צפייה בתנועה הקיימת</Link><div className="mt-2 flex gap-2"><Button disabled={busy} onClick={() => setDuplicateId(null)}>בטל</Button><Button isLoading={busy} onClick={() => void save(true)}>שמור בכל זאת</Button></div></section>}
       {confirmDelete ? <section role="alert" className="my-4 rounded border border-expense p-4"><p>למחוק את התנועה? {detail.documents.length ? "כל המסמכים המצורפים יימחקו גם הם. לא ניתן לבטל את המחיקה." : "לא ניתן לבטל את המחיקה."}</p><div className="mt-3 flex gap-2"><Button variant="secondary" disabled={busy} onClick={() => setConfirmDelete(false)}>בטל</Button><Button className="bg-expense" isLoading={busy} onClick={() => void remove()}>מחק לצמיתות</Button></div></section> : <div className="my-5 flex gap-2">{editing ? <><Button isLoading={busy} onClick={() => void save()}>שמירת שינויים</Button><Button variant="secondary" disabled={busy} onClick={() => { setEditing(false); setDuplicateId(null); }}>ביטול עריכה</Button></> : <Button onClick={() => setEditing(true)}>עריכה</Button>}<Button variant="secondary" disabled={busy} onClick={() => setConfirmDelete(true)}>מחיקה</Button></div>}
-      {detail.documents.map(document => <section key={document.id} className="mt-6"><h3 className="mb-3 font-semibold">{document.file_name}</h3><DocumentViewer storagePath={document.storage_path} mimeType={document.mime_type} /></section>)}
+      {detail.documents.map(document => <section key={document.id} className="mt-6"><h3 className="mb-3 font-semibold">{document.file_name}</h3><MoneySummary value={document} date={document.valuation_date} /><DocumentViewer storagePath={document.storage_path} mimeType={document.mime_type} /></section>)}
     </>}
   </dialog>;
 }

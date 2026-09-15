@@ -1,3 +1,4 @@
+import { CurrencyPreview } from "./CurrencyPreview";
 import { Card, Input, Select, HebrewDatePicker } from "@/components/ui";
 import { DirectionToggle } from "@/components/upload/DirectionToggle";
 import { DOC_TYPE_OPTIONS, VAT_DEDUCTIBLE_OPTIONS } from "@/types/transaction-form";
@@ -102,7 +103,10 @@ export function TransactionForm({
         warning={isLowConfidence(confidence, "doc_date") ? LOW_CONFIDENCE_HINT : undefined}
       />
 
-      <h2 className="mt-2 border-b border-border pb-2 font-semibold">סכומים ומע״מ</h2>
+      <h2 className="mt-2 border-b border-border pb-2 font-semibold">סכומים ומע״מ במטבע המקורי</h2>
+      <Select id="currency" label="מטבע המסמך" value={values.currency} options={[{value:"ILS",label:"שקל — ₪"},{value:"USD",label:"דולר אמריקאי — $"},...(!["ILS","USD"].includes(values.currency)?[{value:values.currency,label:"מטבע לא נתמך — יש לבדוק את המסמך"}]:[])]} onChange={event=>onFieldChange({currency:event.target.value})} />
+      <p className="text-sm text-foreground/60">הזיני את הסכומים כפי שהם במסמך. שינוי המטבע אינו משנה את המספרים שהזנת.</p>
+      <CurrencyPreview values={values} />
       <label className="flex items-center gap-2 rounded-lg border border-border p-3">
         <input type="checkbox" checked={withoutVat} onChange={(event) => onFieldChange({ vatRate: event.target.checked ? "0" : "18" })} />
         <span>ללא מע״מ (למשל, מסמך מעוסק פטור)</span>

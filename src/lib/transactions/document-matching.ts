@@ -10,7 +10,7 @@ export function documentsMayMatch(a: DocumentRow, b: DocumentRow): boolean {
  const business=normalized(x.business_number), otherBusiness=normalized(y.business_number);
  if (business && otherBusiness ? business!==otherBusiness : !name || name!==other) return false;
  if (typeof x.amount_total!=="number" || typeof y.amount_total!=="number" || !Number.isFinite(x.amount_total) || !Number.isFinite(y.amount_total) || x.amount_total<=0 || y.amount_total<=0 || Math.abs(Math.round(x.amount_total*100)-Math.round(y.amount_total*100))>1) return false;
- if ((x.currency ?? "ILS")!=="ILS" || (y.currency ?? "ILS")!=="ILS") return false;
+ if (!["ILS","USD"].includes(String(x.currency??"ILS")) || (x.currency??"ILS")!==(y.currency??"ILS")) return false;
  if (typeof x.doc_date!=="string" || typeof y.doc_date!=="string" || !validDate(x.doc_date) || !validDate(y.doc_date)) return false;
  const invoice=x.doc_type==="invoice_tax"?x:y, receipt=x.doc_type==="receipt"?x:y;
  const gap=(Date.parse(String(receipt.doc_date))-Date.parse(String(invoice.doc_date)))/86400000;
@@ -20,5 +20,5 @@ export function documentsMayMatch(a: DocumentRow, b: DocumentRow): boolean {
 
 export function approvedDocument(document: DocumentRow, transaction: TransactionRow | null): DocumentRow {
  if (!transaction || !transaction.is_verified || transaction.document_id !== document.id || transaction.user_id !== document.user_id) return document;
- return {...document, direction:transaction.direction, extraction_raw:{...document.extraction_raw,counterparty_name:transaction.counterparty_name,business_number:null,doc_type:transaction.doc_type,doc_number:transaction.doc_number,doc_date:transaction.doc_date,amount_total:transaction.amount_total,amount_before_vat:transaction.amount_before_vat,vat_amount:transaction.vat_amount,vat_rate:transaction.vat_rate,currency:transaction.currency}};
+ return {...document, direction:transaction.direction, extraction_raw:{...document.extraction_raw,counterparty_name:transaction.counterparty_name,business_number:null,doc_type:transaction.doc_type,doc_number:transaction.doc_number,doc_date:transaction.doc_date,amount_total:transaction.original_amount_total??transaction.amount_total,amount_before_vat:transaction.original_amount_before_vat??transaction.amount_before_vat,vat_amount:transaction.original_vat_amount??transaction.vat_amount,vat_rate:transaction.vat_rate,currency:transaction.currency}};
 }

@@ -34,6 +34,7 @@ export function resolveRange(params: SearchValues, frequency: ReportingFrequency
 export function summarize(rows: readonly TransactionRow[]): Totals {
   let income = 0; let expense = 0; let vat = 0;
   for (const row of rows) {
+    if (row.currency_review_required) continue;
     const amount = Math.round(row.amount_total * 100);
     if (row.direction === "income") { income += amount; vat += Math.round(row.vat_amount * 100); }
     else { expense += amount; vat -= Math.round(row.vat_amount * row.vat_deductible_percent); }

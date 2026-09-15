@@ -73,6 +73,7 @@ export function buildInitialValuesFromExtraction(
   const vatRate = getNumberField(extractionRaw, "vat_rate");
 
   return {
+    currency: getStringField(extractionRaw, "currency").toUpperCase() || "ILS",
     direction,
     counterpartyName: getStringField(extractionRaw, "counterparty_name"),
     docNumber: getStringField(extractionRaw, "doc_number"),
@@ -90,6 +91,7 @@ export function buildInitialValuesFromExtraction(
 
 export function buildEmptyManualValues(profile: ProfileRow | null): TransactionFormValues {
   return {
+    currency: "ILS",
     direction: "expense",
     counterpartyName: "",
     docNumber: "",

@@ -1,5 +1,7 @@
 "use client";
 
+import { ReceiptAttachment } from "@/components/documents/ReceiptAttachment";
+import { formFromTransaction } from "@/lib/transactions/form-from-transaction";
 import { RemoveReviewDocument } from "@/components/documents/RemoveReviewDocument";
 import { findDocumentPairs, approveDocumentPair, resolveInvoiceDuplicate, type PairCandidate } from "@/lib/transactions/pair-actions";
 import { formatDateDDMMYYYY } from "@/lib/format";
@@ -19,6 +21,7 @@ import { findDuplicateTransactionId } from "@/lib/transactions/duplicate-check";
 import { validateTransactionValues } from "@/lib/transactions/validate-values";
 import { insertTransaction } from "@/lib/transactions/save-transaction";
 import { loadReviewQueue } from "@/lib/transactions/review-queue";
+import type { TransactionFormValues } from "@/types/transaction-form";
 import type { CategoryRow, DocumentRow } from "@/types/db";
 
 type MobileTab = "document" | "form";
@@ -49,6 +52,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
   const [documentRow, setDocumentRow] = useState<DocumentRow | null>(null);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [pairs, setPairs] = useState<PairCandidate[]>([]);
+  const [sourcePairValues,setSourcePairValues] = useState<TransactionFormValues|null>(null);
   const [pair, setPair] = useState<PairCandidate | null>(null);
   const [separateConfirmed, setSeparateConfirmed] = useState(false);
   const [pairError, setPairError] = useState("");
@@ -69,6 +73,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
       setLoadError("");
       setMobileTab("form");
       setPair(null);
+      setSourcePairValues(null);
       setSeparateConfirmed(false);
       setPairs([]);
       setPairError("");
@@ -126,13 +131,15 @@ export default function DocumentReviewPage(): React.JSX.Element {
   const invoiceDocument = documentRow?.extraction_raw?.doc_type === "invoice_tax" ? documentRow : pair?.document ?? documentRow;
   const confidence = getExtractionConfidence((pair ? invoiceDocument : documentRow)?.extraction_raw ?? null);
   function selectPair(candidate: PairCandidate | null): void {
+    if(candidate && !pair)setSourcePairValues(form.values);
+    if(!candidate && sourcePairValues){setPair(null);setSeparateConfirmed(false);form.resetTo(sourcePairValues);setSourcePairValues(null);return;}
     setPair(candidate);
     setSeparateConfirmed(false);
     const invoice = candidate && documentRow?.extraction_raw?.doc_type !== "invoice_tax" ? candidate.document : documentRow;
     if (!invoice) return;
     const t = candidate?.transaction;
     if(t?.doc_type === "invoice_tax") {
-      form.resetTo({direction:t.direction,counterpartyName:t.counterparty_name,docNumber:t.doc_number??"",docType:t.doc_type,docDate:t.doc_date,amountBeforeVat:String(t.amount_before_vat),vatAmount:String(t.vat_amount),amountTotal:String(t.amount_total),vatRate:String(t.vat_rate),vatDeductiblePercent:t.vat_deductible_percent,categoryId:t.category_id,notes:t.notes??""});
+      form.resetTo(formFromTransaction(t));
     } else form.resetTo(buildInitialValuesFromExtraction(invoice.direction, invoice.extraction_raw, null));
   }
   const currentIndex = queueIds.indexOf(documentId);
@@ -157,7 +164,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
     }
     setIsSaving(true);
     let errorMessage: string | null;
-    try { ({ errorMessage } = pair ? await approveDocumentPair(documentId, pair.document.id, form.values, pair.transaction?.updated_at ?? null) : await insertTransaction(supabase, userId, documentId, form.values)); }
+    try { ({ errorMessage } = pair ? await approveDocumentPair(documentId, pair.document.id, form.values, pair.transaction?.updated_at ?? null, sourcePairValues ?? undefined) : await insertTransaction(supabase, userId, documentId, form.values)); }
     catch { errorMessage = "השמירה נכשלה. בדקי את החיבור ונסי שוב."; }
     setIsSaving(false);
 
@@ -208,7 +215,8 @@ export default function DocumentReviewPage(): React.JSX.Element {
           return;
         }
         if (match.invoiceExists) {
-          showToast("קיימת חשבונית מס, אך אין התאמה בטוחה לצירוף הקבלה. בדקי את הסכום, השם והתאריך לפני שמירה כתנועה נוספת.", "error");
+          document.getElementById("attach-receipt")?.scrollIntoView({behavior:"smooth"});
+          showToast("בחרי את החשבונית בחלונית הצירוף ולחצי צרף קבלה לחשבונית.");
           return;
         }
       } catch { showToast("בדיקת החשבונית נכשלה. נסי שוב.", "error"); return; }
@@ -269,6 +277,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
       <p className="truncate font-medium">{documentRow.file_name}</p>
 
       <RemoveReviewDocument id={documentId} returnToList />
+      {form.values.docType === "receipt" && <ReceiptAttachment documentId={documentId} values={form.values} />}
       {pairError && <p role="alert" className="rounded border border-warning p-3">{pairError}</p>}
       {pairs.length > 0 && <section className="rounded-xl border border-primary bg-primary/5 p-4"><h2 className="font-bold">ייתכן שזו אותה עסקה: חשבונית מס וקבלה</h2><p className="mt-2 text-sm">נמצאו שם או מספר עסק תואמים, סכום זהה ותאריכים קרובים. בדקי את שני המסמכים לפני החיבור. הסכום יירשם פעם אחת, לפי החשבונית.</p>{pairs.map(candidate => <div key={candidate.document.id} className="mt-3 rounded border border-border bg-background p-3"><p>{candidate.document.file_name}</p><p className="text-sm">מספר: {String(candidate.document.extraction_raw?.doc_number ?? "לא צוין")} · {formatDateDDMMYYYY(String(candidate.document.extraction_raw?.doc_date ?? ""))}</p>{candidate.transaction && <p className="text-sm">כבר קיימת תנועה למסמך זה. החיבור יצרף את המסמך לתנועה הקיימת, ללא תנועה נוספת.</p>}<Button variant={pair?.document.id === candidate.document.id ? "primary" : "secondary"} disabled={isSaving} onClick={() => selectPair(candidate)}>אלה מסמכים של אותה עסקה</Button><details className="mt-3"><summary className="cursor-pointer text-primary">הצגת המסמך להתאמה</summary><DocumentViewer storagePath={candidate.document.storage_path} mimeType={candidate.document.mime_type} /></details></div>)}{!pair && <Button variant="ghost" disabled={isSaving} onClick={() => setSeparateConfirmed(true)}>{separateConfirmed ? "נבחר אישור כעסקה נפרדת" : "זו עסקה אחרת — אישור בנפרד"}</Button>}{pair && <div className="mt-3"><p className="font-medium">נבחר אישור משותף: שני מסמכים, תנועה אחת.</p>{pair.transaction?.doc_type === "invoice_tax" && <p>סכומי החשבונית שכבר אושרה נשארים כפי שנשמרו. אפשר לערוך אותם דרך התנועות.</p>}{pair.transaction?.doc_type === "receipt" && <p>התנועה שנשמרה כקבלה תעודכן לפי פרטי החשבונית שבטופס. בדקי אותם לפני האישור.</p>}<Button variant="ghost" disabled={isSaving} onClick={() => selectPair(null)}>ביטול החיבור</Button></div>}</section>}
       {queuePosition ? (

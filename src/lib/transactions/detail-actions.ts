@@ -1,4 +1,5 @@
 "use server";
+import { prepareFinancialValues, documentFinancialValues } from "./financial-server";
 import { revalidatePath } from "next/cache";
 import { userContext } from "./load-range";
 import { validateTransactionValues } from "./validate-values";
@@ -41,9 +42,14 @@ export async function updateTransaction(id: string, values: TransactionFormValue
     if (duplicate.error) return { error: "לא ניתן לבדוק כפילויות." };
     if (duplicate.data) return { duplicateId: duplicate.data.id };
   }
-  const result = await supabase.from("transactions").update({ direction: values.direction, counterparty_name: values.counterpartyName.trim(), doc_number: values.docNumber.trim() || null, doc_type: values.docType, doc_date: values.docDate, amount_before_vat: Number(values.amountBeforeVat), vat_amount: Number(values.vatAmount), amount_total: Number(values.amountTotal), vat_rate: Number(values.vatRate), vat_deductible_percent: values.direction === "expense" ? values.vatDeductiblePercent : 100, category_id: values.categoryId, notes: values.notes.trim() || null }).eq("user_id", userId).eq("id", id).eq("updated_at", expectedUpdatedAt).select("id");
-  if (result.error) return { error: "השמירה נכשלה. נסי שוב." };
-  if (!result.data?.length) return { error: "התנועה השתנתה או נמחקה. סגרי את החלונית ופתחי אותה מחדש." };
+  const existing = await supabase.from("transactions").select("document_id").eq("user_id",userId).eq("id",id).maybeSingle();
+  if(existing.error || !existing.data) return {error:"התנועה לא נמצאה."};
+  try {
+    const prepared=await prepareFinancialValues(values);
+    const documentId=existing.data.document_id;
+    const result=await supabase.rpc("save_financial_record",{p_values:{...prepared,document_id:documentId},p_document_values:documentId?{[documentId]:documentFinancialValues(values,prepared)}:{},p_transaction_id:id,p_expected_updated_at:expectedUpdatedAt});
+    if(result.error)return {error:"השמירה נכשלה או שהתנועה השתנתה. רענני ונסי שוב."};
+  } catch(error) {return {error:error instanceof Error?error.message:"שמירת ההמרה נכשלה."};}
   revalidatePath("/transactions"); revalidatePath(`/transactions/${id}`); revalidatePath("/calendar");
   return { success: true };
 }

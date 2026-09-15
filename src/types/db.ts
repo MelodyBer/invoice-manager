@@ -1,3 +1,11 @@
+export type FinancialColumns = {
+ original_amount_before_vat: number | null;
+ original_vat_amount: number | null;
+ original_amount_total: number | null;
+ amount_total_usd: number | null;
+ exchange_rate: number | null;
+ exchange_rate_date: string | null;
+}
 export type Direction = "expense" | "income";
 
 export type ReportingFrequency = "bimonthly" | "monthly";
@@ -57,7 +65,14 @@ export type CategoryInsert = {
 
 export type CategoryUpdate = Partial<Omit<CategoryRow, "id" | "user_id" | "created_at">>;
 
-export type DocumentRow = {
+export type DocumentRow = FinancialColumns & {
+  currency: string | null;
+  valuation_date: string | null;
+  verified_doc_type: DocType | null;
+  verified_counterparty_name: string | null;
+  amount_before_vat: number | null;
+  vat_amount: number | null;
+  amount_total: number | null;
   transaction_id: string | null;
   dismissed_at: string | null;
   id: string;
@@ -90,7 +105,8 @@ export type DocumentInsert = {
 
 export type DocumentUpdate = Partial<Omit<DocumentRow, "id" | "user_id" | "uploaded_at">>;
 
-export type TransactionRow = {
+export type TransactionRow = FinancialColumns & {
+  currency_review_required: boolean;
   id: string;
   user_id: string;
   document_id: string | null;
@@ -112,7 +128,8 @@ export type TransactionRow = {
   updated_at: string;
 };
 
-export type TransactionInsert = {
+export type TransactionInsert = Partial<FinancialColumns> & {
+  currency_review_required?: boolean;
   id?: string;
   user_id: string;
   document_id?: string | null;
@@ -195,6 +212,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      save_financial_record: { Args: { p_values: Record<string, unknown>; p_document_values?: Record<string, unknown>; p_transaction_id?: string; p_expected_updated_at?: string; p_attach_only?: boolean }; Returns: string };
       confirm_documents: { Args: { p_document_ids: string[]; p_values: Record<string, unknown>; p_expected_updated_at?: string }; Returns: string };
       dismiss_review_document: { Args: { p_document_id: string }; Returns: undefined };
     };

@@ -86,7 +86,7 @@ export function parseExtractionResult(input: unknown): ExtractionResult | null {
     doc_number: docNumber,
     doc_type: docType,
     doc_date: docDate,
-    currency,
+    currency: currency.trim().toUpperCase(),
     amount_before_vat: amountBeforeVat,
     vat_amount: vatAmount,
     amount_total: amountTotal,
