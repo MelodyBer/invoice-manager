@@ -69,7 +69,7 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - בדיקות ידניות: אישור מסמך והיעלמותו מהרשימה גם אחרי רענון; עריכת התנועה; פתיחת קישור אישור ישן; אישור ועבור לבא; רשימה ריקה; מסמך הכנסה עם מנפיק ולקוח שונים לעומת מסמך הוצאה; לשוניות וסרגל אישור בטלפון.
 
 עדכון חיבור חשבונית וקבלה והסרה מתור האישורים
-- מוכן בקוד בענף document-pairing-review. לא לפרסם לפני הרצת supabase/migration_3_document_pairing.sql ב-Supabase ואימות הצלחה. הגרסה החיה הקודמת היא 094b0d2.
+- פורסם: הענף document-pairing-review מוזג ל-main, והקוד 0b5d851 פורסם ב-Vercel במצב READY. נבדקו קיום transaction_id ו-dismissed_at וקיום שתי פונקציות ה-RPC במסד החי; גישה אנונימית לפונקציות נחסמת. בדיקת תהליך מלא בחשבון מחובר עדיין נדרשת.
 - שני שדות חדשים ב-documents: transaction_id (קישור בבעלות אותו משתמש באמצעות FK מורכב), dismissed_at (הסרה מהתור ללא מחיקת הקובץ).
 - פונקציות SQL security invoker תחת RLS: confirm_documents שומרת קישור ותנועה באותה טרנזקציה, עם נעילת מסמכים וסינון auth.uid; dismiss_review_document מסירה מהתור אחרי בדיקת קישור לתנועה.
 - זיהוי הצעות מבוסס צד זהה (מספר עסק אם לשניהם יש, אחרת שם מנורמל), כיוון זהה, invoice_tax לעומת receipt, סכום זהה עד אגורה, שקלים בלבד, קבלה מתאריך החשבונית עד 90 יום אחריה. אין חיבור אוטומטי ללא בחירת המשתמשת. סכום חלקי, מטבע זר, תאריך חסר או שני מסמכים מסוג חשבונית מס-קבלה לא מחוברים.
@@ -79,7 +79,7 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - חלונית התנועה מציגה את כל המצורפים. מחיקת תנועה מבקשת אישור למחיקת כל המסמכים. מחיקת Storage ומסד הנתונים עדיין אינה אטומית; קיימת הודעת ניסיון חוזר.
 - הסרה מהתור היא הסתרה בלבד, לא מחיקה לצמיתות; אין בשלב זה מסך שחזור להסתרות.
 - בדיקות TypeScript, build וסקריפט הבדיקות עברו. בדיקות SQL בפועל, RLS על שני חשבונות והתהליך בדפדפן מחובר עדיין לא בוצעו; אין סביבת PostgreSQL מקומית. אין ספריות חדשות.
-- לפני פרסום: המשתמשת מריצה migration_3_document_pairing.sql, מוודאים הצלחה; חוזרים ל-main, ממזגים את הענף, דוחפים ומפרסמים ל-Vercel לפי ההרשאה הקיימת. אין להריץ schema.sql מחדש במקום migration.
+- עדכון migration_3_document_pairing.sql זמין במסד, והמיזוג והפרסום הושלמו. אין צורך להריץ שוב את הסכמה הראשונית.
 - קבצים חדשים: supabase/migration_3_document_pairing.sql, src/lib/transactions/document-matching.ts, src/lib/transactions/pair-actions.ts, src/lib/transactions/transaction-payload.ts, src/components/documents/RemoveReviewDocument.tsx.
 - קבצים ששונו: src/types/db.ts, src/lib/transactions/save-transaction.ts, src/lib/transactions/review-queue.ts, src/lib/transactions/detail-actions.ts, src/components/transactions/TransactionDrawer.tsx, src/app/(app)/documents/page.tsx, src/app/(app)/documents/[id]/review/page.tsx, scripts/test-transactions.cjs, PROJECT_STATUS.md.
 - פקודות: node scripts/test-transactions.cjs; npm run build.
