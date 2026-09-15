@@ -67,3 +67,20 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - קבצים: src/lib/transactions/review-queue.ts (חדש), src/components/transactions/EditTransactionButton.tsx (חדש), src/app/(app)/documents/page.tsx, src/app/(app)/documents/[id]/review/page.tsx, src/app/(app)/transactions/[id]/page.tsx, src/components/transactions/TransactionForm.tsx, src/components/layout/nav-links.ts, src/lib/transactions/detail-actions.ts, src/lib/extraction/schema.ts, src/lib/extraction/extract-document.ts, scripts/test-transactions.cjs, PROJECT_STATUS.md.
 - פקודות: node scripts/test-transactions.cjs; npm run build. אין SQL או ספריות נוספות.
 - בדיקות ידניות: אישור מסמך והיעלמותו מהרשימה גם אחרי רענון; עריכת התנועה; פתיחת קישור אישור ישן; אישור ועבור לבא; רשימה ריקה; מסמך הכנסה עם מנפיק ולקוח שונים לעומת מסמך הוצאה; לשוניות וסרגל אישור בטלפון.
+
+עדכון חיבור חשבונית וקבלה והסרה מתור האישורים
+- מוכן בקוד בענף document-pairing-review. לא לפרסם לפני הרצת supabase/migration_3_document_pairing.sql ב-Supabase ואימות הצלחה. הגרסה החיה הקודמת היא 094b0d2.
+- שני שדות חדשים ב-documents: transaction_id (קישור בבעלות אותו משתמש באמצעות FK מורכב), dismissed_at (הסרה מהתור ללא מחיקת הקובץ).
+- פונקציות SQL security invoker תחת RLS: confirm_documents שומרת קישור ותנועה באותה טרנזקציה, עם נעילת מסמכים וסינון auth.uid; dismiss_review_document מסירה מהתור אחרי בדיקת קישור לתנועה.
+- זיהוי הצעות מבוסס צד זהה (מספר עסק אם לשניהם יש, אחרת שם מנורמל), כיוון זהה, invoice_tax לעומת receipt, סכום זהה עד אגורה, שקלים בלבד, קבלה מתאריך החשבונית עד 90 יום אחריה. אין חיבור אוטומטי ללא בחירת המשתמשת. סכום חלקי, מטבע זר, תאריך חסר או שני מסמכים מסוג חשבונית מס-קבלה לא מחוברים.
+- זוג יחיד ולא עמום מוצג יחד ברשימת האישורים. במסך האישור מוצגים המסמך הראשי והצעות עם תצוגת המקור. כשיש הצעה צריך לבחור חיבור או עסקה נפרדת במפורש.
+- אם החשבונית כבר אושרה, צירוף הקבלה משאיר את נתוני התנועה הקיימת. אם הקבלה אושרה קודם, האישור המשותף מעדכן את אותה תנועה לפרטי החשבונית ומציג על כך הודעה. שתי תנועות קיימות נפרדות אינן ממוזגות אוטומטית.
+- כל אישור חדש של מסמך משתמש ב-RPC אטומי; הזנה ידנית ללא מסמך נשארת במסלול הקיים.
+- חלונית התנועה מציגה את כל המצורפים. מחיקת תנועה מבקשת אישור למחיקת כל המסמכים. מחיקת Storage ומסד הנתונים עדיין אינה אטומית; קיימת הודעת ניסיון חוזר.
+- הסרה מהתור היא הסתרה בלבד, לא מחיקה לצמיתות; אין בשלב זה מסך שחזור להסתרות.
+- בדיקות TypeScript, build וסקריפט הבדיקות עברו. בדיקות SQL בפועל, RLS על שני חשבונות והתהליך בדפדפן מחובר עדיין לא בוצעו; אין סביבת PostgreSQL מקומית. אין ספריות חדשות.
+- לפני פרסום: המשתמשת מריצה migration_3_document_pairing.sql, מוודאים הצלחה; חוזרים ל-main, ממזגים את הענף, דוחפים ומפרסמים ל-Vercel לפי ההרשאה הקיימת. אין להריץ schema.sql מחדש במקום migration.
+- קבצים חדשים: supabase/migration_3_document_pairing.sql, src/lib/transactions/document-matching.ts, src/lib/transactions/pair-actions.ts, src/lib/transactions/transaction-payload.ts, src/components/documents/RemoveReviewDocument.tsx.
+- קבצים ששונו: src/types/db.ts, src/lib/transactions/save-transaction.ts, src/lib/transactions/review-queue.ts, src/lib/transactions/detail-actions.ts, src/components/transactions/TransactionDrawer.tsx, src/app/(app)/documents/page.tsx, src/app/(app)/documents/[id]/review/page.tsx, scripts/test-transactions.cjs, PROJECT_STATUS.md.
+- פקודות: node scripts/test-transactions.cjs; npm run build.
+- בדיקות ידניות אחרי פרסום: 1. חשבונית 118 וקבלה 118 מאותו צד — אישור משותף, תנועה אחת בסך 118 ושני מצורפים; שניהם יוצאים מהתור. 2. קבלה שמגיעה אחרי אישור החשבונית — צירוף ללא שינוי סכומים או ספירה נוספת. 3. חשבונית לאחר אישור קבלה — בדיקה ואישור עדכון התנועה הקיימת. 4. צד או מטבע אחר/סכום חלקי — אין הצעת חיבור. 5. ביטול חיבור ועסקה נפרדת במפורש. 6. ביטול הסרה לעומת אישור הסרה ורענון; הקובץ נשמר. 7. ניסיון מקביל בשתי לשוניות או שינוי תנועה לפני אישור — אין תנועה כפולה. 8. חשבון שני לא רואה ולא מחבר מסמכים של הראשון. 9. כל התהליך בטלפון.

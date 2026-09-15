@@ -1,5 +1,8 @@
 "use client";
 
+import { RemoveReviewDocument } from "@/components/documents/RemoveReviewDocument";
+import { findDocumentPairs, approveDocumentPair, type PairCandidate } from "@/lib/transactions/pair-actions";
+import { formatDateDDMMYYYY } from "@/lib/format";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -45,6 +48,10 @@ export default function DocumentReviewPage(): React.JSX.Element {
   const [userId, setUserId] = useState<string | null>(null);
   const [documentRow, setDocumentRow] = useState<DocumentRow | null>(null);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [pairs, setPairs] = useState<PairCandidate[]>([]);
+  const [pair, setPair] = useState<PairCandidate | null>(null);
+  const [separateConfirmed, setSeparateConfirmed] = useState(false);
+  const [pairError, setPairError] = useState("");
   const [queueIds, setQueueIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -61,20 +68,29 @@ export default function DocumentReviewPage(): React.JSX.Element {
       setIsLoading(true);
       setLoadError("");
       setMobileTab("form");
+      setPair(null);
+      setSeparateConfirmed(false);
+      setPairs([]);
+      setPairError("");
 
       const { data: userData } = await supabase.auth.getUser();
       const currentUserId = userData.user?.id ?? null;
       if (!currentUserId) { router.replace("/login"); return; }
 
-      const [documentResult, categoriesResult, profileResult, pendingDocs, existing] = await Promise.all([
+      const [documentResult, categoriesResult, profileResult, pendingDocs, existing, pairResult] = await Promise.all([
         supabase.from("documents").select("*").eq("user_id", currentUserId).eq("id", documentId).single(),
         supabase.from("categories").select("*").eq("user_id", currentUserId).order("name"),
         supabase.from("profiles").select("*").eq("id", currentUserId).single(),
         loadReviewQueue(supabase, currentUserId),
         supabase.from("transactions").select("id").eq("user_id", currentUserId).eq("document_id", documentId).eq("is_verified", true).limit(1).maybeSingle(),
+        findDocumentPairs(documentId),
       ]);
       if (isCancelled) return;
       if (documentResult.error || categoriesResult.error || profileResult.error || existing.error) throw new Error("טעינת המסמך נכשלה");
+      if (documentResult.data?.dismissed_at) { router.replace("/documents"); return; }
+      if (documentResult.data?.transaction_id) { router.replace(`/transactions/${documentResult.data.transaction_id}`); return; }
+      setPairs(pairResult.candidates);
+      setPairError(pairResult.error ?? "");
       if (existing.data) { router.replace(`/transactions/${existing.data.id}`); return; }
       const documentData = documentResult.data;
       const categoriesData = categoriesResult.data;
@@ -107,7 +123,18 @@ export default function DocumentReviewPage(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
-  const confidence = getExtractionConfidence(documentRow?.extraction_raw ?? null);
+  const invoiceDocument = documentRow?.extraction_raw?.doc_type === "invoice_tax" ? documentRow : pair?.document ?? documentRow;
+  const confidence = getExtractionConfidence((pair ? invoiceDocument : documentRow)?.extraction_raw ?? null);
+  function selectPair(candidate: PairCandidate | null): void {
+    setPair(candidate);
+    setSeparateConfirmed(false);
+    const invoice = candidate && documentRow?.extraction_raw?.doc_type !== "invoice_tax" ? candidate.document : documentRow;
+    if (!invoice) return;
+    const t = candidate?.transaction;
+    if(t?.doc_type === "invoice_tax") {
+      form.resetTo({direction:t.direction,counterpartyName:t.counterparty_name,docNumber:t.doc_number??"",docType:t.doc_type,docDate:t.doc_date,amountBeforeVat:String(t.amount_before_vat),vatAmount:String(t.vat_amount),amountTotal:String(t.amount_total),vatRate:String(t.vat_rate),vatDeductiblePercent:t.vat_deductible_percent,categoryId:t.category_id,notes:t.notes??""});
+    } else form.resetTo(buildInitialValuesFromExtraction(invoice.direction, invoice.extraction_raw, null));
+  }
   const currentIndex = queueIds.indexOf(documentId);
   const queuePosition = currentIndex !== -1 ? currentIndex + 1 : null;
 
@@ -130,7 +157,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
     }
     setIsSaving(true);
     let errorMessage: string | null;
-    try { ({ errorMessage } = await insertTransaction(supabase, userId, documentId, form.values)); }
+    try { ({ errorMessage } = pair ? await approveDocumentPair(documentId, pair.document.id, form.values, pair.transaction?.updated_at ?? null) : await insertTransaction(supabase, userId, documentId, form.values)); }
     catch { errorMessage = "השמירה נכשלה. בדקי את החיבור ונסי שוב."; }
     setIsSaving(false);
 
@@ -143,7 +170,8 @@ export default function DocumentReviewPage(): React.JSX.Element {
     router.refresh();
 
     if (andNext) {
-      const nextId = currentIndex !== -1 ? queueIds[currentIndex + 1] ?? queueIds.find(id => id !== documentId) : undefined;
+      const remaining = queueIds.filter(id => id !== documentId && id !== pair?.document.id);
+      const nextId = remaining[0];
       router.push(nextId ? `/documents/${nextId}/review` : "/documents");
     } else {
       router.push("/documents");
@@ -151,7 +179,8 @@ export default function DocumentReviewPage(): React.JSX.Element {
   }
 
   async function handleSaveClick(andNext: boolean): Promise<void> {
-    if (!userId || isSaving) return;
+    if (!userId || isSaving || pairError) return;
+    if (pairs.length && !pair && !separateConfirmed) { showToast("נמצאו מסמכים דומים. בחרי חיבור או אישור כעסקה נפרדת.", "error"); return; }
     const validation = validateTransactionValues(form.values);
     if (validation) { showToast(validation, "error"); return; }
     setIsSaving(true);
@@ -165,7 +194,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
     } catch { showToast("לא ניתן לבדוק כפילויות. נסי שוב.", "error"); return; }
     finally { setIsSaving(false); }
 
-    if (existingId) {
+    if (existingId && existingId !== pair?.transaction?.id) {
       setDuplicateState({
         isOpen: true,
         existingTransactionId: existingId,
@@ -219,6 +248,9 @@ export default function DocumentReviewPage(): React.JSX.Element {
       <p className="text-sm text-foreground/60">בדקי את הפרטים מול המסמך. שדות בצהוב דורשים תשומת לב. לאחר האישור המסמך יעבור לתנועות.</p>
       <p className="truncate font-medium">{documentRow.file_name}</p>
 
+      <RemoveReviewDocument id={documentId} returnToList />
+      {pairError && <p role="alert" className="rounded border border-warning p-3">{pairError}</p>}
+      {pairs.length > 0 && <section className="rounded-xl border border-primary bg-primary/5 p-4"><h2 className="font-bold">ייתכן שזו אותה עסקה: חשבונית מס וקבלה</h2><p className="mt-2 text-sm">נמצאו שם או מספר עסק תואמים, סכום זהה ותאריכים קרובים. בדקי את שני המסמכים לפני החיבור. הסכום יירשם פעם אחת, לפי החשבונית.</p>{pairs.map(candidate => <div key={candidate.document.id} className="mt-3 rounded border border-border bg-background p-3"><p>{candidate.document.file_name}</p><p className="text-sm">מספר: {String(candidate.document.extraction_raw?.doc_number ?? "לא צוין")} · {formatDateDDMMYYYY(String(candidate.document.extraction_raw?.doc_date ?? ""))}</p>{candidate.transaction && <p className="text-sm">כבר קיימת תנועה למסמך זה. החיבור יצרף את המסמך לתנועה הקיימת, ללא תנועה נוספת.</p>}<Button variant={pair?.document.id === candidate.document.id ? "primary" : "secondary"} disabled={isSaving} onClick={() => selectPair(candidate)}>אלה מסמכים של אותה עסקה</Button><details className="mt-3"><summary className="cursor-pointer text-primary">הצגת המסמך להתאמה</summary><DocumentViewer storagePath={candidate.document.storage_path} mimeType={candidate.document.mime_type} /></details></div>)}{!pair && <Button variant="ghost" disabled={isSaving} onClick={() => setSeparateConfirmed(true)}>{separateConfirmed ? "נבחר אישור כעסקה נפרדת" : "זו עסקה אחרת — אישור בנפרד"}</Button>}{pair && <div className="mt-3"><p className="font-medium">נבחר אישור משותף: שני מסמכים, תנועה אחת.</p>{pair.transaction?.doc_type === "invoice_tax" && <p>סכומי החשבונית שכבר אושרה נשארים כפי שנשמרו. אפשר לערוך אותם דרך התנועות.</p>}{pair.transaction?.doc_type === "receipt" && <p>התנועה שנשמרה כקבלה תעודכן לפי פרטי החשבונית שבטופס. בדקי אותם לפני האישור.</p>}<Button variant="ghost" disabled={isSaving} onClick={() => selectPair(null)}>ביטול החיבור</Button></div>}</section>}
       {queuePosition ? (
         <div className="flex items-center justify-center gap-4">
           <button
@@ -268,7 +300,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
 
       <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className={mobileTab === "form" ? "block" : "hidden lg:block"}>
-          <fieldset disabled={isSaving}>
+          <fieldset disabled={isSaving || pair?.transaction?.doc_type === "invoice_tax"}>
           <TransactionForm
             values={form.values}
             onFieldChange={form.setField}
@@ -284,10 +316,10 @@ export default function DocumentReviewPage(): React.JSX.Element {
       </div>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 border-t border-border bg-background p-4 shadow-lg">
-        <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving}>
-          אשר ושמור
+        <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving} disabled={Boolean(pairError)}>
+          {pair ? "אשר חיבור ושמור כתנועה אחת" : "אשר ושמור"}
         </Button>
-        <Button variant="secondary" onClick={() => void handleSaveClick(true)} isLoading={isSaving}>
+        <Button variant="secondary" onClick={() => void handleSaveClick(true)} isLoading={isSaving} disabled={Boolean(pairError)}>
           אשר ועבור לבא
         </Button>
       </div>
@@ -308,7 +340,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
             <Button variant="secondary" onClick={handleDuplicateCancel}>
               ביטול
             </Button>
-            <Button onClick={() => void handleDuplicateConfirm()} isLoading={isSaving}>
+            <Button onClick={() => void handleDuplicateConfirm()} isLoading={isSaving} disabled={Boolean(pairError)}>
               שמור בכל זאת
             </Button>
           </div>

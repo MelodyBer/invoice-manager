@@ -4,7 +4,7 @@ import { userContext } from "./load-range";
 import { validateTransactionValues } from "./validate-values";
 import type { TransactionFormValues } from "@/types/transaction-form";
 import type { TransactionRow, DocumentRow, CategoryRow } from "@/types/db";
-export type Detail = { transaction: TransactionRow; document: DocumentRow | null; categories: CategoryRow[] };
+export type Detail = { transaction: TransactionRow; document: DocumentRow | null; documents: DocumentRow[]; categories: CategoryRow[] };
 export type ActionResult = { error?: string; duplicateId?: string; success?: boolean };
 export async function getDetail(id: string): Promise<{ detail?: Detail; error?: string }> {
   const { supabase, userId } = await userContext();
@@ -20,7 +20,11 @@ export async function getDetail(id: string): Promise<{ detail?: Detail; error?: 
   if (documentResult.error) return { error: "לא ניתן לטעון את המסמך." };
   const categories = categoryResult.data;
   const document = documentResult.data;
-  return { detail: { transaction, document, categories: categories ?? [] } };
+  const attachments = await supabase.from("documents").select("*").eq("user_id", userId).eq("transaction_id", id).order("uploaded_at");
+  if (attachments.error) return { error: "לא ניתן לטעון את המסמכים המצורפים." };
+  const documents = [...(attachments.data ?? [])];
+  if (document && !documents.some(item => item.id === document.id)) documents.unshift(document);
+  return { detail: { transaction, document, documents, categories: categories ?? [] } };
 }
 export async function updateTransaction(id: string, values: TransactionFormValues, expectedUpdatedAt: string, allowDuplicate = false): Promise<ActionResult> {
   const { supabase, userId } = await userContext();
@@ -47,17 +51,22 @@ export async function deleteTransaction(id: string): Promise<ActionResult> {
   const { supabase, userId } = await userContext();
   const transaction = await supabase.from("transactions").select("document_id").eq("user_id", userId).eq("id", id).maybeSingle();
   if (transaction.error || !transaction.data) return { error: "התנועה לא נמצאה או שכבר נמחקה." };
-  const documentId = transaction.data.document_id;
-  if (documentId) {
-    const linked = await supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("document_id", documentId).neq("id", id);
-    if (linked.error) return { error: "לא ניתן לבדוק את המסמך המצורף." };
-    if (linked.count) return { error: "המסמך משותף לתנועות נוספות. המחיקה נעצרה כדי לא למחוק את המסמך שלהן." };
-    const doc = await supabase.from("documents").select("storage_path").eq("user_id", userId).eq("id", documentId).maybeSingle();
-    if (doc.error || !doc.data || doc.data.storage_path.split("/")[0] !== userId) return { error: "לא ניתן לאמת את המסמך למחיקה." };
-    const removed = await supabase.storage.from("documents").remove([doc.data.storage_path]);
-    if (removed.error) return { error: "מחיקת הקובץ נכשלה. התנועה לא נמחקה. נסי שוב." };
-    const deletedDoc = await supabase.from("documents").delete().eq("user_id", userId).eq("id", documentId);
-    if (deletedDoc.error) return { error: "הקובץ נמחק, אך ניקוי הרשומה נכשל. לחצי שוב על מחיקה להשלמה." };
+  const primaryDocumentId = transaction.data.document_id;
+  const linkedDocuments = await supabase.from("documents").select("*").eq("user_id", userId).eq("transaction_id", id);
+  if (linkedDocuments.error) return { error: "לא ניתן לבדוק את המסמכים למחיקה." };
+  const documents = [...(linkedDocuments.data ?? [])];
+  if (primaryDocumentId && !documents.some(document => document.id === primaryDocumentId)) {
+    const legacy = await supabase.from("documents").select("*").eq("user_id", userId).eq("id", primaryDocumentId).maybeSingle();
+    if (legacy.error || !legacy.data) return { error: "לא ניתן לאמת את המסמך למחיקה." };
+    documents.push(legacy.data);
+  }
+  if (documents.length) {
+    const shared = await supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", userId).in("document_id", documents.map(document => document.id)).neq("id", id);
+    if (shared.error || shared.count || documents.some(document => (document.transaction_id && document.transaction_id !== id) || document.storage_path.split("/")[0] !== userId)) return { error: "מסמך מקושר לתנועה נוספת או שלא ניתן לאמת את הבעלות. המחיקה נעצרה." };
+    const removed = await supabase.storage.from("documents").remove(documents.map(document => document.storage_path));
+    if (removed.error) return { error: "מחיקת הקבצים נכשלה. התנועה נשמרה; נסי שוב." };
+    const deleted = await supabase.from("documents").delete().eq("user_id", userId).in("id", documents.map(document => document.id));
+    if (deleted.error) return { error: "הקבצים נמחקו אך ניקוי הרשומות נכשל. נסי שוב להשלמה." };
   }
   const result = await supabase.from("transactions").delete().eq("user_id", userId).eq("id", id).select("id");
   if (result.error) return { error: "מחיקת התנועה לא הושלמה. אם צורף מסמך, ייתכן שכבר נמחק. נסי שוב." };

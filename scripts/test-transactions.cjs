@@ -68,10 +68,10 @@ function database(responses) {
   assert.ok((await actions(foreign).getDetail("foreign-id")).error);
   assert.equal(foreign.calls.length, 1);
   assert.ok(foreign.calls[0].steps.some(step => step[1] === "user_id" && step[2] === "owner"));
-  const shared = database([{ data: { document_id: "doc" }, error: null }, { count: 1, error: null }]);
+  const shared = database([{ data: { document_id: "doc" }, error: null }, { data: [{ id: "doc", transaction_id: "id", storage_path: "owner/doc" }], error: null }, { count: 1, error: null }]);
   assert.ok((await actions(shared).deleteTransaction("id")).error);
   assert.equal(shared.calls.some(call => call.storage), false);
-  const manual = database([{ data: { document_id: null }, error: null }, { data: [{ id: "id" }], error: null }]);
+  const manual = database([{ data: { document_id: null }, error: null }, { data: [], error: null }, { data: [{ id: "id" }], error: null }]);
   assert.equal((await actions(manual).deleteTransaction("id")).success, true);
   assert.equal(manual.calls.some(call => call.storage), false);
   const values = { direction: "expense", counterpartyName: "test", docNumber: "1", notes: "", docType: "invoice_tax", docDate: "2026-09-01", amountBeforeVat: "100", vatAmount: "18", amountTotal: "118", vatRate: "18", vatDeductiblePercent: 100, categoryId: null };
@@ -129,3 +129,34 @@ console.log("Passed: no-VAT preserves paid total, resets manual VAT, keeps categ
   assert.notEqual(extractionInstruction("income"), extractionInstruction("expense"));
   console.log("Passed: approved documents excluded, user isolation filters, queue pagination, errors not treated as empty, direction-aware extraction instructions.");
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+const { documentsMayMatch } = load("src/lib/transactions/document-matching.ts");
+const invoice = {id:"invoice",user_id:"owner",direction:"expense",extraction_raw:{doc_type:"invoice_tax",counterparty_name:"עסק לדוגמה",amount_total:118,currency:"ILS",doc_date:"2026-09-01"}};
+const receipt = {id:"receipt",user_id:"owner",direction:"expense",extraction_raw:{...invoice.extraction_raw,doc_type:"receipt",doc_date:"2026-09-03"}};
+assert.equal(documentsMayMatch(invoice,receipt),true);
+assert.equal(documentsMayMatch(receipt,invoice),true);
+assert.equal(documentsMayMatch(invoice,{...receipt,user_id:"other"}),false);
+assert.equal(documentsMayMatch(invoice,{...receipt,direction:"income"}),false);
+assert.equal(documentsMayMatch(invoice,{...receipt,dismissed_at:"2026-09-01"}),false);
+for (const patch of [{amount_total:59},{currency:"USD"},{counterparty_name:"עסק אחר"},{doc_date:"2025-01-01"},{doc_date:"2027-01-01"},{doc_type:"invoice_tax_receipt"},{doc_date:null}]) {
+ assert.equal(documentsMayMatch(invoice,{...receipt,extraction_raw:{...receipt.extraction_raw,...patch}}),false);
+}
+assert.equal(documentsMayMatch({...invoice,extraction_raw:{...invoice.extraction_raw,business_number:"123"}},{...receipt,extraction_raw:{...receipt.extraction_raw,business_number:"456"}}),false);
+console.log("Passed: complementary documents, different owner/direction/currency/party, partial payments, invalid/distant dates, combined receipts and removed files.");
+
+assert.equal(documentsMayMatch(invoice,{...receipt,status:"processing"}),false);
+assert.equal(documentsMayMatch(invoice,{...receipt,extraction_raw:{...receipt.extraction_raw,amount_total:NaN}}),false);
+assert.equal(documentsMayMatch({...invoice,extraction_raw:{...invoice.extraction_raw,currency:"USD"}},{...receipt,extraction_raw:{...receipt.extraction_raw,currency:"USD"}}),false);
+(async () => {
+ const { insertTransaction } = load("src/lib/transactions/save-transaction.ts");
+ const calls=[];
+ const values={direction:"expense",counterpartyName:"test",docNumber:"1",docType:"invoice_tax",docDate:"2026-09-01",amountBeforeVat:"100",vatAmount:"18",amountTotal:"118",vatRate:"18",vatDeductiblePercent:100,categoryId:null,notes:""};
+ const rpcClient={rpc:async (name,args)=>{calls.push({name,args});return {data:"transaction",error:null};},from:()=>{throw new Error("Document approval must not use separate inserts");}};
+ assert.equal((await insertTransaction(rpcClient,"owner","document",values)).errorMessage,null);
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].name,"confirm_documents");
+ assert.deepEqual(calls[0].args.p_document_ids,["document"]);
+ const failed={...rpcClient,rpc:async()=>({error:{message:"stale"}})};
+ assert.ok((await insertTransaction(failed,"owner","document",values)).errorMessage);
+ console.log("Passed: document approval uses one atomic RPC and reports failure without fallback insert.");
+})().catch(error=>{console.error(error);process.exitCode=1;});

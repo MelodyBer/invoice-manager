@@ -58,6 +58,8 @@ export type CategoryInsert = {
 export type CategoryUpdate = Partial<Omit<CategoryRow, "id" | "user_id" | "created_at">>;
 
 export type DocumentRow = {
+  transaction_id: string | null;
+  dismissed_at: string | null;
   id: string;
   user_id: string;
   direction: Direction;
@@ -72,6 +74,8 @@ export type DocumentRow = {
 };
 
 export type DocumentInsert = {
+  transaction_id?: string | null;
+  dismissed_at?: string | null;
   id?: string;
   user_id: string;
   direction: Direction;
@@ -190,7 +194,10 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      confirm_documents: { Args: { p_document_ids: string[]; p_values: Record<string, unknown>; p_expected_updated_at?: string }; Returns: string };
+      dismiss_review_document: { Args: { p_document_id: string }; Returns: undefined };
+    };
     Enums: Record<string, never>;
   };
 };

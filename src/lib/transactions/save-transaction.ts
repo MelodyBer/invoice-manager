@@ -1,3 +1,4 @@
+import { transactionPayload } from "./transaction-payload";
 import { validateTransactionValues } from "./validate-values";
 import type { createClient } from "@/lib/supabase/client";
 import type { TransactionFormValues } from "@/types/transaction-form";
@@ -21,6 +22,10 @@ export async function insertTransaction(
 ): Promise<SaveTransactionResult> {
   const validation = validateTransactionValues(values);
   if (validation) return { errorMessage: validation };
+  if (documentId) {
+    const { error } = await supabase.rpc("confirm_documents", { p_document_ids: [documentId], p_values: transactionPayload(values) });
+    return { errorMessage: error ? "השמירה נכשלה. ייתכן שהמסמך כבר אושר או הוסר. רענני ובדקי." : null };
+  }
   const [document, category] = await Promise.all([
     documentId ? supabase.from("documents").select("id").eq("user_id", userId).eq("id", documentId).single() : Promise.resolve(null),
     values.categoryId ? supabase.from("categories").select("id").eq("user_id", userId).eq("id", values.categoryId).eq("direction", values.direction).single() : Promise.resolve(null),
