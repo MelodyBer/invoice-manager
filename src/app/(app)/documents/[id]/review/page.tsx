@@ -192,9 +192,8 @@ export default function DocumentReviewPage(): React.JSX.Element {
     let errorMessage: string | null;
     try { ({ errorMessage } = pair ? await approveDocumentPair(documentId, pair.document.id, form.values, pair.transaction?.updated_at ?? null, sourcePairValues ?? undefined) : await insertTransaction(supabase, userId, documentId, form.values)); }
     catch { errorMessage = "השמירה נכשלה. בדקי את החיבור ונסי שוב."; }
-    setIsSaving(false);
-
     if (errorMessage) {
+      setIsSaving(false);
       showToast(errorMessage, "error");
       return;
     }
