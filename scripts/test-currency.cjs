@@ -1,7 +1,7 @@
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),ts=require("typescript");
 const root=path.resolve(__dirname,"..");
 function load(file,mocks={}){const output=ts.transpileModule(fs.readFileSync(path.join(root,file),"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;const mod={exports:{}};const local=name=>{if(name in mocks)return mocks[name];if(name==="server-only")return {};if(name.startsWith("@/"))return load("src/"+name.slice(2)+".ts",mocks);if(name.startsWith("./"))return load(path.join(path.dirname(file),name+".ts"),mocks);return require(name);};new Function("exports","module","require",output)(mod.exports,mod,local);return mod.exports;}
-const {parseBoiCsv,convertMoney}=load("src/lib/currency/money.ts");
+const {parseBoiCsv,convertMoney,shekelMoney}=load("src/lib/currency/money.ts");
 const csv='SERIES_CODE,TIME_PERIOD,OBS_VALUE,COMMENTS\r\nRER_USD_ILS,2026-02-05,3.117,"a,b"\r\nRER_USD_ILS,2026-02-06,3.125,"quoted ""text"""\r\nRER_USD_ILS,2026-02-09,9,future\r\nRER_EUR_ILS,2026-02-08,10,other';
 const quote=parseBoiCsv(csv,"2026-02-08");
 assert.equal(quote.rate,3.125);assert.equal(quote.rateDate,"2026-02-06");
@@ -14,6 +14,13 @@ assert.equal(ils.amount_total,118);assert.equal(ils.amount_total_usd,37.76);
 assert.equal(convertMoney("USD",100,0,100,quote).vat_amount,0);
 assert.throws(()=>convertMoney("USD",100,0,150,quote));
 assert.throws(()=>convertMoney("USD",100,0,100,{...quote,rate:0}));
+assert.deepEqual(shekelMoney(100,18,118),{currency:"ILS",original_amount_before_vat:100,original_vat_amount:18,original_amount_total:118,amount_before_vat:100,vat_amount:18,amount_total:118,amount_total_usd:null,exchange_rate:null,exchange_rate_date:null});
+assert.equal(shekelMoney(20,0,20).amount_total,20);
+assert.equal(shekelMoney(100,18.01,118).vat_amount,18);
+assert.throws(()=>shekelMoney(100,0,150));
+assert.throws(()=>shekelMoney(Infinity,0,100));
+assert.throws(()=>shekelMoney(1e10,0,1e10));
+assert.throws(()=>shekelMoney(1.001,0,1.001));
 const invoice=convertMoney("USD",100,0,100,{...quote,rate:3.1});
 const receipt=convertMoney("USD",100,0,100,{...quote,rate:3.2});
 assert.equal(invoice.amount_total,310);assert.equal(receipt.amount_total,320);
@@ -60,5 +67,30 @@ function db(invoiceRow,error=null){const calls=[];return {calls,from(table){cons
  assert.equal(saveDb.calls[0].args.p_values.currency,"USD");
  assert.equal(saveDb.calls[0].args.p_values.amount_total,312.5);
  assert.equal(saveDb.calls[0].args.p_document_values.document.original_amount_total,100);
+ let rateCalls=0;
+ const noRate={getBoiRate:async()=>{rateCalls++;throw new Error("offline");}};
+ const ilsDb=db(savedInvoice);
+ const ilsMocks={...mocks,"./load-range":{userContext:async()=>({supabase:ilsDb,userId:"owner"})},"@/lib/currency/boi":noRate};
+ const ilsSave=load("src/lib/transactions/financial-actions.ts",ilsMocks);
+ const ilsValues={...values,currency:"ILS",amountBeforeVat:"100",vatAmount:"18",amountTotal:"118",vatRate:"18"};
+ assert.equal((await ilsSave.saveFinancialTransaction("ils-document",ilsValues)).errorMessage,null);
+ assert.equal(rateCalls,0,"ILS saving must not contact the rate service");
+ const ilsRpc=ilsDb.calls.find(call=>call.rpc);
+ for(const payload of [ilsRpc.args.p_values,ilsRpc.args.p_document_values["ils-document"]]) {
+  assert.equal(payload.amount_total,118);assert.equal(payload.amount_before_vat,100);assert.equal(payload.vat_amount,18);
+  assert.equal(payload.amount_total_usd,null);assert.equal(payload.exchange_rate,null);assert.equal(payload.exchange_rate_date,null);
+ }
+ assert.equal((await ilsSave.saveFinancialTransaction(null,{...ilsValues,vatAmount:"0",amountTotal:"100"})).errorMessage,null);
+ const ilsAttach=load("src/lib/transactions/attach-receipt.ts",ilsMocks);
+ assert.deepEqual(await ilsAttach.attachReceipt("ils-receipt","invoice","version",ilsValues),{});
+ assert.equal(rateCalls,0);
+ const {prepareFinancialValues}=load("src/lib/transactions/financial-server.ts",ilsMocks);
+ await assert.rejects(()=>prepareFinancialValues({...ilsValues,docDate:"2019-01-01"}));
+ await assert.rejects(()=>prepareFinancialValues({...ilsValues,docDate:"2999-01-01"}));
+ await assert.rejects(()=>prepareFinancialValues({...ilsValues,amountTotal:"999"}));
+ assert.equal(rateCalls,0);
+ await assert.rejects(()=>prepareFinancialValues(values));
+ assert.equal(rateCalls,1,"USD must still require a real exchange rate");
+ console.log("Passed: ILS saves and attachment use zero exchange-rate calls, null conversion fields, preserved amounts and date validation; USD still requires rates.");
  console.log("Passed: BOI CSV, weekend/holiday fallback, no future rate, USD/ILS conversion, VAT rounding, per-document dates, atomic attachment with unchanged invoice, owner isolation, stale saves, unavailable rates and legacy exclusion.");
 })().catch(error=>{console.error(error);process.exitCode=1;});

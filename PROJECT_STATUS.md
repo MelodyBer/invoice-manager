@@ -171,3 +171,13 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 ## הסתרת המרה בטופס שקלי — 21/09/2026
 - CurrencyPreview מציג המרה וטוען שער לתצוגה רק כאשר המטבע USD. בשקל או מטבע אחר הרכיב אינו מוצג. החלפת מטבע מבטלת תוצאות בקשה קודמת. שמירה וחישובים בשרת ללא שינוי.
 - קבצים: src/components/transactions/CurrencyPreview.tsx, PROJECT_STATUS.md. npm run build עבר. בדיקה ידנית: טופס שקלי ללא המרה; דולרי עם שער וסכום בשקלים; מעבר בין שני המטבעות. אין SQL או פקודות להרצה.
+
+
+## שמירה שקלית ללא פנייה לבנק ישראל — ממתין ל־migration_5
+- prepareFinancialValues משתמש ב־shekelMoney עבור ILS בלבד: הסכומים נשארים בשקלים; exchange_rate, exchange_rate_date, amount_total_usd הם null. מסלול USD נשאר getBoiRate ו-convertMoney ללא שינוי. מגבלות תאריך 2020 עד היום נשמרות גם בשקל. התאמת אגורה במע״מ נשארת כפי שהייתה.
+- MonetaryValues מאפשר null; ConvertedMonetaryValues שומר טיפוסים מספריים למסלול עם שער. MoneySummary אינו מציג אזהרת שער חסר למסמך שקלי ללא שער. אין שינוי בהתאמות, כפילויות, חילוץ, RLS או סינון בעלות.
+- migration_5_ils_without_exchange_rate.sql מחליף רק valid_currency_values: ILS בלי שער מותר, USD עדיין דורש שער, ונתיב ILS ישן עם שער נשאר תקין. העמודות כבר nullable ב-migration_4. אין עדכון רשומות. בדיקות SQL מובנות רצות באותה טרנזקציה לפני commit; לא הורצו על PostgreSQL בסביבה זו.
+- חובה להריץ migration_5 לפני פרסום האפליקציה. אין לפרסם את הקוד עד התקנת SQL. הגרסה הקודמת יכולה לעבוד עם האימות החדש.
+- בדיקות שעברו: node scripts/test-transactions.cjs; node scripts/test-currency.cjs; npm run build. בדיקות חדשות: אפס קריאות שער ב-ILS בשמירה רגילה, ידנית וצירוף; שדות null; סכומים ותאריכים לא תקינים נדחים; USD נכשל כשאין שער וממשיך להמיר עם שער אמיתי.
+- מדידת משתמשת לפני התיקון באתר החי עם משתמשת מחוברת: כ־3.5 שניות מלחיצה על אשר ושמור. אין מדידה חיה אחרי התיקון עדיין. לאחר פרסום למדוד 3–5 שמירות של מסמכי ILS חדשים דומים באותו מכשיר/רשת, מהלחיצה עד הודעת הצלחה/מעבר; לרשום כל זמן וחציון. לבדוק 118 ₪ (100+18), ללא מע״מ, USD ושמירת שערים ישנים ללא עריכה; לבדוק שבקשת BOI אינה מתרחשת בנתיב ILS.
+- קבצים: src/lib/transactions/financial-server.ts, src/lib/currency/money.ts, src/components/transactions/MoneySummary.tsx, scripts/test-currency.cjs, supabase/migration_5_ils_without_exchange_rate.sql (חדש), PROJECT_STATUS.md.

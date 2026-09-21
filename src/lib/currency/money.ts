@@ -2,10 +2,24 @@ export type Currency = "ILS" | "USD";
 export interface RateQuote { rate: number; rateDate: string; requestedDate: string; source: "בנק ישראל"; }
 export interface MonetaryValues {
  currency: Currency; original_amount_before_vat: number; original_vat_amount: number; original_amount_total: number;
- exchange_rate: number; exchange_rate_date: string; amount_before_vat: number; vat_amount: number; amount_total: number; amount_total_usd: number;
+ exchange_rate: number | null; exchange_rate_date: string | null; amount_before_vat: number; vat_amount: number; amount_total: number; amount_total_usd: number | null;
+}
+export interface ConvertedMonetaryValues extends MonetaryValues {
+ exchange_rate: number; exchange_rate_date: string; amount_total_usd: number;
+}
+export function shekelMoney(before: number, vat: number, total: number): MonetaryValues {
+ const amounts = [before, vat, total];
+ if (!amounts.every(Number.isFinite) || amounts.some(value => value < 0 || value >= 1e10) || total <= 0
+  || amounts.some(value => Math.abs(value * 100 - Math.round(value * 100)) > 0.0001)
+  || Math.abs(Math.round(before * 100) + Math.round(vat * 100) - Math.round(total * 100)) > 1) {
+  throw new Error("סכומים לא תקינים.");
+ }
+ return { currency: "ILS", original_amount_before_vat: before, original_vat_amount: vat, original_amount_total: total,
+  amount_before_vat: before, vat_amount: Math.round((total - before) * 100) / 100, amount_total: total,
+  exchange_rate: null, exchange_rate_date: null, amount_total_usd: null };
 }
 function roundedDivide(numerator: bigint, denominator: bigint): bigint { return (numerator + denominator / BigInt(2)) / denominator; }
-export function convertMoney(currency: Currency, before: number, vat: number, total: number, quote: RateQuote): MonetaryValues {
+export function convertMoney(currency: Currency, before: number, vat: number, total: number, quote: RateQuote): ConvertedMonetaryValues {
  if (!["ILS","USD"].includes(currency)) throw new Error("מטבע לא נתמך.");
  if (![before,vat,total,quote.rate].every(Number.isFinite) || before<0 || vat<0 || total<=0 || quote.rate<=0 || Math.abs(Math.round(before*100)+Math.round(vat*100)-Math.round(total*100))>1) throw new Error("סכומים או שער לא תקינים.");
  const rate=BigInt(Math.round(quote.rate*1e8)), scale=BigInt(100000000);
