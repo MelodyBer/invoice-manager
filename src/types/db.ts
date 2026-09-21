@@ -212,6 +212,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      merge_approved_documents: { Args: { p_invoice_id: string; p_receipt_id: string; p_invoice_version: string; p_receipt_version: string }; Returns: string };
       save_financial_record: { Args: { p_values: Record<string, unknown>; p_document_values?: Record<string, unknown>; p_transaction_id?: string; p_expected_updated_at?: string; p_attach_only?: boolean }; Returns: string };
       confirm_documents: { Args: { p_document_ids: string[]; p_values: Record<string, unknown>; p_expected_updated_at?: string }; Returns: string };
       dismiss_review_document: { Args: { p_document_id: string }; Returns: undefined };

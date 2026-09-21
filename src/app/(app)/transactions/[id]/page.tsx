@@ -1,3 +1,4 @@
+import { MergeApprovedDocuments } from "@/components/transactions/MergeApprovedDocuments";
 import { MoneySummary } from "@/components/transactions/MoneySummary";
 import { EditTransactionButton } from "@/components/transactions/EditTransactionButton";
 import Link from "next/link";
@@ -12,5 +13,5 @@ export default async function TransactionPage({ params }: { params: Promise<{ id
   if (!auth.user) redirect("/login");
   const { data } = await supabase.from("transactions").select("*").eq("user_id", auth.user.id).eq("id", id).maybeSingle();
   if (!data) notFound();
-  return <section className="flex flex-col gap-4"><h1 className="text-2xl font-bold">פרטי התנועה</h1><p>{data.counterparty_name}</p><p>מספר מסמך: {data.doc_number ?? "לא צוין"}</p><p>תאריך: {formatDateDDMMYYYY(data.doc_date)}</p><MoneySummary value={data} date={data.doc_date} needsReview={data.currency_review_required} /><p>{data.notes}</p><EditTransactionButton id={id} /><Link href="/transactions">חזרה לתנועות</Link></section>;
+  return <section className="flex flex-col gap-4"><h1 className="text-2xl font-bold">פרטי התנועה</h1><p>{data.counterparty_name}</p><p>מספר מסמך: {data.doc_number ?? "לא צוין"}</p><p>תאריך: {formatDateDDMMYYYY(data.doc_date)}</p><MoneySummary value={data} date={data.doc_date} needsReview={data.currency_review_required} /><p>{data.notes}</p><EditTransactionButton id={id} /><MergeApprovedDocuments key={id} transaction={data} /><Link href="/transactions">חזרה לתנועות</Link></section>;
 }
