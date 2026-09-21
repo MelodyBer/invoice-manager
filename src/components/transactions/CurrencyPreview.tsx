@@ -4,9 +4,10 @@ import { loadRate } from "@/lib/currency/actions";
 import { convertMoney,formatMoney,type RateQuote } from "@/lib/currency/money";
 import type { TransactionFormValues } from "@/types/transaction-form";
 import { formatDateDDMMYYYY } from "@/lib/format";
-export function CurrencyPreview({values}:{values:TransactionFormValues}):React.JSX.Element{
+export function CurrencyPreview({values}:{values:TransactionFormValues}):React.JSX.Element | null{
  const [quote,setQuote]=useState<RateQuote|null>(null),[error,setError]=useState(""),[retry,setRetry]=useState(0);
- useEffect(()=>{let active=true;setQuote(null);setError("");if(!values.docDate)return;void loadRate(values.docDate).then(result=>{if(active){setQuote(result.quote??null);setError(result.error??"");}}).catch(()=>{if(active)setError("טעינת השער נכשלה. נסי שוב.");});return()=>{active=false;};},[values.docDate,retry]);
+ useEffect(()=>{let active=true;setQuote(null);setError("");if(values.currency!=="USD"||!values.docDate)return;void loadRate(values.docDate).then(result=>{if(active){setQuote(result.quote??null);setError(result.error??"");}}).catch(()=>{if(active)setError("טעינת השער נכשלה. נסי שוב.");});return()=>{active=false;};},[values.docDate,values.currency,retry]);
+ if(values.currency!=="USD")return null;
  let money:ReturnType<typeof convertMoney>|null=null;
  if(quote?.requestedDate===values.docDate&&(values.currency==="USD"||values.currency==="ILS")){try{money=convertMoney(values.currency,Number(values.amountBeforeVat),Number(values.vatAmount),Number(values.amountTotal),quote);}catch{/* Shown by form validation before save. */}}
  return <div className="rounded-lg border border-border bg-primary/5 p-3 text-sm" aria-live="polite">
