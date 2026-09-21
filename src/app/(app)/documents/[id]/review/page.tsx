@@ -1,5 +1,6 @@
 "use client";
 
+import { ReviewComparison } from "@/components/documents/ReviewComparison";
 import { ReceiptAttachment } from "@/components/documents/ReceiptAttachment";
 import { formFromTransaction } from "@/lib/transactions/form-from-transaction";
 import { RemoveReviewDocument } from "@/components/documents/RemoveReviewDocument";
@@ -339,8 +340,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
         </button>
       </div>
 
-      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
-        <div className={mobileTab === "form" ? "block" : "hidden lg:block"}>
+      <ReviewComparison key={documentId} document={documentRow} userId={userId ?? ""} values={form.values} enabled={!pair && !isSaving} mobileTab={mobileTab}>
           <fieldset disabled={isSaving || pair?.transaction?.doc_type === "invoice_tax"}>
           <TransactionForm
             values={form.values}
@@ -350,11 +350,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
             isVatManuallyEdited={form.isVatManuallyEdited}
           />
           </fieldset>
-        </div>
-        <div className={mobileTab === "document" ? "block lg:sticky lg:top-4" : "hidden lg:sticky lg:top-4 lg:block"}>
-          <DocumentViewer key={documentRow.id} storagePath={documentRow.storage_path} mimeType={documentRow.mime_type} />
-        </div>
-      </div>
+      </ReviewComparison>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 border-t border-border bg-background p-4 shadow-lg">
         <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving} disabled={Boolean(pairError)}>

@@ -56,6 +56,23 @@ function database(responses) {
   }, storage: { from() { return { remove: async () => { calls.push({ storage: true }); return { error: null }; } }; } } };
 }
 (async () => {
+  const { findApprovedDuplicateId } = load("src/lib/transactions/duplicate-check.ts");
+  const duplicateParams = { counterpartyName: " ספק ", docNumber: " 123 ", docDate: "2026-09-01", docType: "receipt", direction: "expense" };
+  const approvedDb = database([{ data: { id: "approved" }, error: null }]);
+  assert.equal(await findApprovedDuplicateId(approvedDb, "owner", duplicateParams), "approved");
+  for (const [column, value] of Object.entries({ user_id: "owner", is_verified: true, counterparty_name: "ספק", doc_number: "123", doc_date: "2026-09-01", doc_type: "receipt", direction: "expense" })) {
+    assert.ok(approvedDb.calls[0].steps.some(step => step[0] === "eq" && step[1] === column && step[2] === value), `Missing approved duplicate filter: ${column}`);
+  }
+  const blankDb = database([]);
+  assert.equal(await findApprovedDuplicateId(blankDb, "owner", { ...duplicateParams, docDate: "" }), null);
+  assert.equal(await findApprovedDuplicateId(blankDb, "owner", { ...duplicateParams, counterpartyName: " " }), null);
+  assert.equal(blankDb.calls.length, 0);
+  const nullNumberDb = database([{data: null, error: null}]);
+  assert.equal(await findApprovedDuplicateId(nullNumberDb, "owner", { ...duplicateParams, docNumber: "" }), null);
+  assert.ok(nullNumberDb.calls[0].steps.some(step => step[0] === "is" && step[1] === "doc_number" && step[2] === null));
+  await assert.rejects(() => findApprovedDuplicateId(database([{data: null, error: {message: "offline"}}]), "owner", duplicateParams));
+  console.log("Passed: early duplicate detection scopes verified records by owner and document type, trims identifiers, skips incomplete fields and surfaces failures.");
+
   const db = database([{ data: Array.from({ length: 500 }, (_, id) => ({ id })), error: null }, { data: [{ id: 501 }], error: null }]);
   const { loadRange } = load("src/lib/transactions/load-range.ts", { "next/navigation": {}, "@/lib/supabase/server": {} });
   assert.equal((await loadRange(db, "owner", "2026-09-01", "2026-09-30")).length, 501);
