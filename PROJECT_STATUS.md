@@ -136,3 +136,11 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - src/types/db.ts
 - src/types/transaction-form.ts
 - supabase/migration_4_currency.sql
+
+
+## פישוט בחירת חיבור במסך האישור — 21/09/2026
+- הצעת ההתאמה האוטומטית מופיעה ראשונה באזור חיבור אחד. חיפוש חשבוניות מאושרות סגור כברירת מחדל, נפתח רק ביוזמת המשתמשת, ומסומן כרשימה כללית ולא כהתאמות. אין קריאת חיפוש נוספת עד לפתיחה.
+- בחירת התאמה סוגרת את החיפוש ומסבירה שיש להשלים באישור החיבור בתחתית. במקרה של כפילות ללא התאמה החיפוש נפתח אוטומטית. אין שינוי בשמירה או בסכומים.
+- קבצים: src/app/(app)/documents/[id]/review/page.tsx, src/components/documents/ReceiptAttachment.tsx, PROJECT_STATUS.md.
+- בדיקות שעברו: node scripts/test-transactions.cjs; node scripts/test-currency.cjs; npm run build. לא בוצעה בדיקת ממשק בחשבון מחובר.
+- בדיקה ידנית: הצעה מופיעה ללא רשימה כללית; פתיחת וסגירת חיפוש אחר; בחירת התאמה וביטולה; השלמת חיבור ותנועה אחת עם שני מסמכים; אותו תהליך בטלפון. אין SQL או התקנות נוספות.

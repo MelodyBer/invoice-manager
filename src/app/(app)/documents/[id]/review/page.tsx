@@ -56,6 +56,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
   const [pair, setPair] = useState<PairCandidate | null>(null);
   const [separateConfirmed, setSeparateConfirmed] = useState(false);
   const [pairError, setPairError] = useState("");
+  const [showInvoiceSearch, setShowInvoiceSearch] = useState(false);
   const [queueIds, setQueueIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -77,6 +78,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
       setSeparateConfirmed(false);
       setPairs([]);
       setPairError("");
+      setShowInvoiceSearch(false);
 
       const { data: userData } = await supabase.auth.getUser();
       const currentUserId = userData.user?.id ?? null;
@@ -134,6 +136,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
     if(candidate && !pair)setSourcePairValues(form.values);
     if(!candidate && sourcePairValues){setPair(null);setSeparateConfirmed(false);form.resetTo(sourcePairValues);setSourcePairValues(null);return;}
     setPair(candidate);
+    setShowInvoiceSearch(false);
     setSeparateConfirmed(false);
     const invoice = candidate && documentRow?.extraction_raw?.doc_type !== "invoice_tax" ? candidate.document : documentRow;
     if (!invoice) return;
@@ -215,7 +218,8 @@ export default function DocumentReviewPage(): React.JSX.Element {
           return;
         }
         if (match.invoiceExists) {
-          document.getElementById("attach-receipt")?.scrollIntoView({behavior:"smooth"});
+          setShowInvoiceSearch(true);
+          document.getElementById("document-linking")?.scrollIntoView({behavior:"smooth"});
           showToast("בחרי את החשבונית בחלונית הצירוף ולחצי צרף קבלה לחשבונית.");
           return;
         }
@@ -277,9 +281,17 @@ export default function DocumentReviewPage(): React.JSX.Element {
       <p className="truncate font-medium">{documentRow.file_name}</p>
 
       <RemoveReviewDocument id={documentId} returnToList />
-      {form.values.docType === "receipt" && <ReceiptAttachment documentId={documentId} values={form.values} />}
+      <section id="document-linking" aria-label="חיבור חשבונית וקבלה" className="space-y-3">
       {pairError && <p role="alert" className="rounded border border-warning p-3">{pairError}</p>}
-      {pairs.length > 0 && <section className="rounded-xl border border-primary bg-primary/5 p-4"><h2 className="font-bold">ייתכן שזו אותה עסקה: חשבונית מס וקבלה</h2><p className="mt-2 text-sm">נמצאו שם או מספר עסק תואמים, סכום זהה ותאריכים קרובים. בדקי את שני המסמכים לפני החיבור. הסכום יירשם פעם אחת, לפי החשבונית.</p>{pairs.map(candidate => <div key={candidate.document.id} className="mt-3 rounded border border-border bg-background p-3"><p>{candidate.document.file_name}</p><p className="text-sm">מספר: {String(candidate.document.extraction_raw?.doc_number ?? "לא צוין")} · {formatDateDDMMYYYY(String(candidate.document.extraction_raw?.doc_date ?? ""))}</p>{candidate.transaction && <p className="text-sm">כבר קיימת תנועה למסמך זה. החיבור יצרף את המסמך לתנועה הקיימת, ללא תנועה נוספת.</p>}<Button variant={pair?.document.id === candidate.document.id ? "primary" : "secondary"} disabled={isSaving} onClick={() => selectPair(candidate)}>אלה מסמכים של אותה עסקה</Button><details className="mt-3"><summary className="cursor-pointer text-primary">הצגת המסמך להתאמה</summary><DocumentViewer storagePath={candidate.document.storage_path} mimeType={candidate.document.mime_type} /></details></div>)}{!pair && <Button variant="ghost" disabled={isSaving} onClick={() => setSeparateConfirmed(true)}>{separateConfirmed ? "נבחר אישור כעסקה נפרדת" : "זו עסקה אחרת — אישור בנפרד"}</Button>}{pair && <div className="mt-3"><p className="font-medium">נבחר אישור משותף: שני מסמכים, תנועה אחת.</p>{pair.transaction?.doc_type === "invoice_tax" && <p>סכומי החשבונית שכבר אושרה נשארים כפי שנשמרו. אפשר לערוך אותם דרך התנועות.</p>}{pair.transaction?.doc_type === "receipt" && <p>התנועה שנשמרה כקבלה תעודכן לפי פרטי החשבונית שבטופס. בדקי אותם לפני האישור.</p>}<Button variant="ghost" disabled={isSaving} onClick={() => selectPair(null)}>ביטול החיבור</Button></div>}</section>}
+      {pairs.length > 0 && <section className="rounded-xl border border-primary bg-primary/5 p-4"><h2 className="font-bold">נמצאה התאמה אפשרית למסמך</h2><p className="mt-2 text-sm">נמצאו שם או מספר עסק תואמים, סכום זהה ותאריכים קרובים. בדקי את שני המסמכים לפני החיבור. הסכום יירשם פעם אחת, לפי החשבונית.</p>{pairs.map(candidate => <div key={candidate.document.id} className="mt-3 rounded border border-border bg-background p-3"><p>{candidate.document.file_name}</p><p className="text-sm">מספר: {String(candidate.document.extraction_raw?.doc_number ?? "לא צוין")} · {formatDateDDMMYYYY(String(candidate.document.extraction_raw?.doc_date ?? ""))}</p>{candidate.transaction && <p className="text-sm">כבר קיימת תנועה למסמך זה. החיבור יצרף את המסמך לתנועה הקיימת, ללא תנועה נוספת.</p>}<Button variant={pair?.document.id === candidate.document.id ? "primary" : "secondary"} disabled={isSaving} onClick={() => selectPair(candidate)}>בחירת המסמך לחיבור</Button><details className="mt-3"><summary className="cursor-pointer text-primary">הצגת המסמך להתאמה</summary><DocumentViewer storagePath={candidate.document.storage_path} mimeType={candidate.document.mime_type} /></details></div>)}{!pair && <Button variant="ghost" disabled={isSaving} onClick={() => setSeparateConfirmed(true)}>{separateConfirmed ? "נבחר אישור כעסקה נפרדת" : "זו עסקה אחרת — אישור בנפרד"}</Button>}{pair && <div className="mt-3"><p className="font-medium">נבחרו שני מסמכים לתנועה אחת. בדקי את הפרטים ולחצי למטה על ״אשר חיבור ושמור כתנועה אחת״ להשלמת החיבור.</p>{pair.transaction?.doc_type === "invoice_tax" && <p>סכומי החשבונית שכבר אושרה נשארים כפי שנשמרו. אפשר לערוך אותם דרך התנועות.</p>}{pair.transaction?.doc_type === "receipt" && <p>התנועה שנשמרה כקבלה תעודכן לפי פרטי החשבונית שבטופס. בדקי אותם לפני האישור.</p>}<Button variant="ghost" disabled={isSaving} onClick={() => selectPair(null)}>ביטול החיבור</Button></div>}</section>}
+      {!pair && form.values.docType === "receipt" && <div className="rounded-xl border border-border p-4">
+        {!pairs.length && <p className="mb-2 text-sm">לא נמצאה התאמה אוטומטית. אם כבר אישרת חשבונית עבור הקבלה הזו, אפשר לחפש אותה ולצרף אליה את הקבלה. אחרת, בדקי את הפרטים ואשרי כתנועה חדשה.</p>}
+        <Button variant="secondary" disabled={isSaving} aria-expanded={showInvoiceSearch} aria-controls="invoice-search-panel" onClick={() => setShowInvoiceSearch(current => !current)}>
+          {showInvoiceSearch ? "סגירת החיפוש" : pairs.length ? "חיפוש חשבונית אחרת" : "חיפוש חשבונית שכבר אושרה"}
+        </Button>
+        {showInvoiceSearch && <div id="invoice-search-panel" className="mt-3"><ReceiptAttachment documentId={documentId} values={form.values} /></div>}
+      </div>}
+      </section>
       {queuePosition ? (
         <div className="flex items-center justify-center gap-4">
           <button
