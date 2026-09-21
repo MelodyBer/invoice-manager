@@ -181,3 +181,6 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - בדיקות שעברו: node scripts/test-transactions.cjs; node scripts/test-currency.cjs; npm run build. בדיקות חדשות: אפס קריאות שער ב-ILS בשמירה רגילה, ידנית וצירוף; שדות null; סכומים ותאריכים לא תקינים נדחים; USD נכשל כשאין שער וממשיך להמיר עם שער אמיתי.
 - מדידת משתמשת לפני התיקון באתר החי עם משתמשת מחוברת: כ־3.5 שניות מלחיצה על אשר ושמור. אין מדידה חיה אחרי התיקון עדיין. לאחר פרסום למדוד 3–5 שמירות של מסמכי ILS חדשים דומים באותו מכשיר/רשת, מהלחיצה עד הודעת הצלחה/מעבר; לרשום כל זמן וחציון. לבדוק 118 ₪ (100+18), ללא מע״מ, USD ושמירת שערים ישנים ללא עריכה; לבדוק שבקשת BOI אינה מתרחשת בנתיב ILS.
 - קבצים: src/lib/transactions/financial-server.ts, src/lib/currency/money.ts, src/components/transactions/MoneySummary.tsx, scripts/test-currency.cjs, supabase/migration_5_ils_without_exchange_rate.sql (חדש), PROJECT_STATUS.md.
+
+
+עדכון פרסום migration_5: המשתמשת דיווחה Success; בדיקת RPC עם ערכי דוגמה בלבד במסד החי אישרה ILS ללא שער=true ו-USD ללא שער=false. הענף מוזג ל-main וקוד 51769f2 פורסם ב-Vercel במצב READY. הוראת ההמתנה לפרסום לעיל הושלמה. עדיין נדרשת מדידת אשר ושמור עם משתמשת מחוברת לאחר הפרסום; אין תוצאת מדידה חדשה.
