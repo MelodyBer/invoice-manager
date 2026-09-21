@@ -73,6 +73,15 @@ function database(responses) {
   await assert.rejects(() => findApprovedDuplicateId(database([{data: null, error: {message: "offline"}}]), "owner", duplicateParams));
   console.log("Passed: early duplicate detection scopes verified records by owner and document type, trims identifiers, skips incomplete fields and surfaces failures.");
 
+  const sourceInvoice = { id: "source", user_id: "owner", direction: "expense", status: "processed", extraction_raw: { doc_type: "invoice_tax", doc_date: "2026-09-01", counterparty_name: "Supplier", amount_total: 100, currency: "ILS" } };
+  const receiptBatch = Array.from({length: 30}, (_, i) => ({ ...sourceInvoice, id: `receipt-${i}`, extraction_raw: {...sourceInvoice.extraction_raw, doc_type: "receipt"} }));
+  const matchingDb = database([{data: sourceInvoice, error: null}, {data: receiptBatch, error: null}, {data: [], error: null}]);
+  const matchingActions = load("src/lib/transactions/pair-actions.ts", {"next/cache": {revalidatePath() {}}, "./load-range": {userContext: async () => ({supabase: matchingDb, userId: "owner"})}});
+  assert.equal((await matchingActions.findDocumentPairs("source")).candidates.length, 30);
+  assert.equal(matchingDb.calls.length, 3, "Thirty documents require one batched transaction query, not thirty individual queries");
+  for (const call of matchingDb.calls) assert.ok(call.steps.some(step => step[0] === "eq" && step[1] === "user_id" && step[2] === "owner"));
+  assert.ok(matchingDb.calls[2].steps.some(step => step[0] === "in" && step[1] === "document_id" && step[2].length === 30));
+  console.log("Passed: matching thirty documents uses three scoped queries including source and document batch.");
   const db = database([{ data: Array.from({ length: 500 }, (_, id) => ({ id })), error: null }, { data: [{ id: 501 }], error: null }]);
   const { loadRange } = load("src/lib/transactions/load-range.ts", { "next/navigation": {}, "@/lib/supabase/server": {} });
   assert.equal((await loadRange(db, "owner", "2026-09-01", "2026-09-30")).length, 501);

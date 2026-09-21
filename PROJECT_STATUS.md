@@ -152,3 +152,11 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - קבצים: src/components/documents/ReviewComparison.tsx (חדש), src/components/documents/RemoveReviewDocument.tsx, src/app/(app)/documents/[id]/review/page.tsx, src/lib/transactions/duplicate-check.ts, scripts/test-transactions.cjs, PROJECT_STATUS.md.
 - בדיקות שעברו: node scripts/test-transactions.cjs; npm run build. נוספו בדיקות סינון בעלות/מאושרים/סוג מסמך, שדות חסרים, מספר ריק וכשל שאילתה. בדיקת דפדפן בחשבון מחובר טרם בוצעה.
 - בדיקות ידניות: התראה לפני שמירה; פתיחה וסגירת השוואה בלי הסתרת הטופס; שינוי שדות מבטל התאמה ישנה; ביטול הסרה ואז הסרה תוך שמירת התנועה המקורית; ללא מצורף; חשבון אחר; מובייל. אין SQL או התקנות חדשות.
+
+
+## שיפור פתיחת מסמך לאישור — 21/09/2026
+- הטופס מוצג לאחר טעינת המסמך, הקטגוריות, הפרופיל ובדיקת קישור קיים. תור האישורים וההתאמות נטענים בנפרד לאחר מכן ואינם חוסמים הצגת הטופס. האישור חסום עד השלמת בדיקת התאמות; אישור ועבור לבא זמין לאחר טעינת התור. כשל בתור לא חוסם שמירה רגילה.
+- שאילתת תנועה נפרדת לכל מסמך הוחלפה בשאילתות אצווה לפי מזהים, עם סינון user_id ועימוד לקישורים ישנים. בדיקה של 30 מסמכים מאמתת 3 קריאות כולל מקור ואצוות מסמכים במקום 32. אין שינוי בכללי התאמה.
+- עברו test-transactions.cjs, test-currency.cjs ו-npm run build. כלי Chrome DevTools אינו זמין; לא נמדד זמן פתיחה בחשבון מחובר ואין טענה לכמות שניות שנחסכה.
+- קבצים: src/app/(app)/documents/[id]/review/page.tsx, src/lib/transactions/pair-actions.ts, scripts/test-transactions.cjs, PROJECT_STATUS.md.
+- בדיקה ידנית: פתיחת מסמך מרשימת האישורים; הופעת פרטים לפני סיום ההתאמות; שמירה רק בסיום הבדיקה; שמירת ההצעות והתרעות הכפילות; מעבר לבא וניווט מהיר בין מסמכים; נייד. אין SQL או פקודות נוספות למשתמשת.

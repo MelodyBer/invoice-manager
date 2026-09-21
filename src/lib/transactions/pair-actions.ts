@@ -42,13 +42,28 @@ export async function findDocumentPairs(id: string): Promise<{ candidates: PairC
  for(let offset=0;;offset+=200) {
    const batch=await supabase.from("documents").select("*").eq("user_id",userId).eq("direction",source.data.direction).is("dismissed_at",null).gte("extraction_raw->>doc_date",before).lte("extraction_raw->>doc_date",after).eq("extraction_raw->>doc_type",kind==="invoice_tax"?"receipt":"invoice_tax").order("id").range(offset,offset+199);
    if(batch.error) return {candidates:[],error:"בדיקת ההתאמה נכשלה. רענני לפני האישור."};
-   for(const document of batch.data ?? []) {
-     const query=supabase.from("transactions").select("*").eq("user_id",userId);
-     const linked=document.transaction_id ? await query.eq("id",document.transaction_id).maybeSingle() : await query.eq("document_id",document.id).limit(1).maybeSingle();
-     if(linked.error) return {candidates:[],error:"לא ניתן לבדוק את התנועה המקושרת."};
-     if(linked.data && linked.data.document_id!==document.id) continue;
-     const effective=approvedDocument(document,linked.data);
-     if(documentsMayMatch(source.data,effective) && !candidates.some(candidate=>candidate.document.id===document.id)) candidates.push({document:effective,transaction:linked.data});
+   const documents = batch.data ?? [];
+   const transactionIds = [...new Set(documents.flatMap(document => document.transaction_id ? [document.transaction_id] : []))];
+   const legacyIds = documents.filter(document => !document.transaction_id).map(document => document.id);
+   const linkedRows: TransactionRow[] = [];
+   if (transactionIds.length) {
+     const linked = await supabase.from("transactions").select("*").eq("user_id",userId).in("id",transactionIds);
+     if (linked.error) return {candidates:[],error:"לא ניתן לבדוק את התנועה המקושרת."};
+     linkedRows.push(...(linked.data ?? []));
+   }
+   if (legacyIds.length) {
+     for (let start = 0; ; start += 500) {
+       const linked = await supabase.from("transactions").select("*").eq("user_id",userId).in("document_id",legacyIds).order("id").range(start,start+499);
+       if (linked.error) return {candidates:[],error:"לא ניתן לבדוק את התנועה המקושרת."};
+       linkedRows.push(...(linked.data ?? []));
+       if ((linked.data ?? []).length < 500) break;
+     }
+   }
+   for(const document of documents) {
+     const linked = linkedRows.find(transaction => document.transaction_id ? transaction.id === document.transaction_id : transaction.document_id === document.id) ?? null;
+     if(linked && linked.document_id!==document.id) continue;
+     const effective=approvedDocument(document,linked);
+     if(documentsMayMatch(source.data,effective) && !candidates.some(candidate=>candidate.document.id===document.id)) candidates.push({document:effective,transaction:linked});
    }
    if((batch.data ?? []).length<200) return {candidates};
  }
