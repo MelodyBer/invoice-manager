@@ -144,3 +144,11 @@ GitHub: https://github.com/MelodyBer/invoice-manager
 - קבצים: src/app/(app)/documents/[id]/review/page.tsx, src/components/documents/ReceiptAttachment.tsx, PROJECT_STATUS.md.
 - בדיקות שעברו: node scripts/test-transactions.cjs; node scripts/test-currency.cjs; npm run build. לא בוצעה בדיקת ממשק בחשבון מחובר.
 - בדיקה ידנית: הצעה מופיעה ללא רשימה כללית; פתיחת וסגירת חיפוש אחר; בחירת התאמה וביטולה; השלמת חיבור ותנועה אחת עם שני מסמכים; אותו תהליך בטלפון. אין SQL או התקנות נוספות.
+
+
+## זיהוי מוקדם של כפילות והשוואה בצד — 21/09/2026
+- הבדיקה מתבצעת בפתיחת מסמך ובשינוי שדות, עם השהיה של 350ms וביטול תשובות ישנות. נבדקים שם, מספר, תאריך, סוג מסמך וכיוון מול תנועות מאושרות של המשתמש בלבד. סוגים שונים כגון חשבונית וקבלה לא מוצגים כעותק זהה. בדיקת הכפילות בעת שמירה נשארת.
+- התראה מציעה השוואה או הסרה מתור האישור, עם אישור ההסרה הקיים. אין מחיקת תנועה או קבצים. ההשוואה מציגה פרטים ומצורפים מאושרים משמאל והטופס נשאר מימין. בטלפון התצוגה מתחת לטופס ללא כיסוי. אפשר לפתוח גם את המקור הממתין. תנועה ללא מצורף מציגה פרטים בלבד.
+- קבצים: src/components/documents/ReviewComparison.tsx (חדש), src/components/documents/RemoveReviewDocument.tsx, src/app/(app)/documents/[id]/review/page.tsx, src/lib/transactions/duplicate-check.ts, scripts/test-transactions.cjs, PROJECT_STATUS.md.
+- בדיקות שעברו: node scripts/test-transactions.cjs; npm run build. נוספו בדיקות סינון בעלות/מאושרים/סוג מסמך, שדות חסרים, מספר ריק וכשל שאילתה. בדיקת דפדפן בחשבון מחובר טרם בוצעה.
+- בדיקות ידניות: התראה לפני שמירה; פתיחה וסגירת השוואה בלי הסתרת הטופס; שינוי שדות מבטל התאמה ישנה; ביטול הסרה ואז הסרה תוך שמירת התנועה המקורית; ללא מצורף; חשבון אחר; מובייל. אין SQL או התקנות חדשות.
