@@ -8,7 +8,7 @@ import { findDocumentPairs, approveDocumentPair, resolveInvoiceDuplicate, type P
 import { formatDateDDMMYYYY } from "@/lib/format";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Dialog, EmptyState, Spinner, useToast } from "@/components/ui";
 import { TransactionForm } from "@/components/transactions/TransactionForm";
@@ -159,6 +159,10 @@ export default function DocumentReviewPage(): React.JSX.Element {
       form.resetTo(formFromTransaction(t));
     } else form.resetTo(buildInitialValuesFromExtraction(invoice.direction, invoice.extraction_raw, null));
   }
+  const needsPairDecision = pairs.length > 0 && !pair && !separateConfirmed;
+  const saveBlocked = Boolean(pairError) || needsPairDecision;
+  const saveBlockedRef = useRef(saveBlocked);
+  useEffect(() => { saveBlockedRef.current = saveBlocked; }, [saveBlocked]);
   const currentIndex = queueIds.indexOf(documentId);
   const queuePosition = currentIndex !== -1 ? currentIndex + 1 : null;
 
@@ -175,6 +179,11 @@ export default function DocumentReviewPage(): React.JSX.Element {
   }
 
   async function performSave(andNext: boolean): Promise<void> {
+    // A match can arrive while the duplicate check is awaiting a response.
+    if (saveBlockedRef.current) {
+      showToast("בדקי את ההתאמה שנמצאה ובחרי חיבור או עסקה נפרדת לפני השמירה.", "error");
+      return;
+    }
     if (!userId) {
       showToast("לא זוהה משתמש מחובר.", "error");
       return;
@@ -194,7 +203,12 @@ export default function DocumentReviewPage(): React.JSX.Element {
     router.refresh();
 
     if (andNext) {
-      const remaining = queueIds.filter(id => id !== documentId && id !== pair?.document.id);
+      let nextQueue = queueIds;
+      if (!queueReady) {
+        try { nextQueue = (await loadReviewQueue(supabase, userId)).filter(document => document.status !== "processing").map(document => document.id); }
+        catch { router.push("/documents"); return; }
+      }
+      const remaining = nextQueue.filter(id => id !== documentId && id !== pair?.document.id);
       const nextId = remaining[0];
       router.push(nextId ? `/documents/${nextId}/review` : "/documents");
     } else {
@@ -203,7 +217,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
   }
 
   async function handleSaveClick(andNext: boolean): Promise<void> {
-    if (!userId || isSaving || pairError || isCheckingPairs || (andNext && !queueReady)) return;
+    if (!userId || isSaving || pairError) return;
     if (pairs.length && !pair && !separateConfirmed) { showToast("נמצאו מסמכים דומים. בחרי חיבור או אישור כעסקה נפרדת.", "error"); return; }
     const validation = validateTransactionValues(form.values);
     if (validation) { showToast(validation, "error"); return; }
@@ -368,10 +382,10 @@ export default function DocumentReviewPage(): React.JSX.Element {
       </ReviewComparison>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 border-t border-border bg-background p-4 shadow-lg">
-        <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving} disabled={Boolean(pairError) || isCheckingPairs}>
+        <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving} disabled={saveBlocked}>
           {pair ? "אשר חיבור ושמור כתנועה אחת" : "אשר ושמור"}
         </Button>
-        <Button variant="secondary" onClick={() => void handleSaveClick(true)} isLoading={isSaving} disabled={Boolean(pairError) || isCheckingPairs || !queueReady}>
+        <Button variant="secondary" onClick={() => void handleSaveClick(true)} isLoading={isSaving} disabled={saveBlocked}>
           אשר ועבור לבא
         </Button>
       </div>
@@ -392,7 +406,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
             <Button variant="secondary" onClick={handleDuplicateCancel}>
               ביטול
             </Button>
-            <Button onClick={() => void handleDuplicateConfirm()} isLoading={isSaving} disabled={Boolean(pairError) || isCheckingPairs}>
+            <Button onClick={() => void handleDuplicateConfirm()} isLoading={isSaving} disabled={saveBlocked}>
               שמור בכל זאת
             </Button>
           </div>
