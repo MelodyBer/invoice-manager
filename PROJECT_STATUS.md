@@ -226,3 +226,9 @@ financial-actions.ts רושם שורה אחת save_timing לכל הפעלה של
 
 
 עדכון פרסום migration_6: המשתמשת דיווחה שבוצע. בדיקה עם פרמטרים ריקים וללא התחברות החזירה 401/42501, המעידה שהפונקציה קיימת והרצתה לאנונימיים חסומה; לא שונו נתונים. הענף מוזג ל-main, וקוד a48aaa3 פורסם ב-Vercel במצב READY. אין צורך ב-SQL נוסף. חיבור אמיתי של שני מסמכים תחת חשבון מחובר עדיין נדרש לבדיקת המשתמשת.
+
+
+## תיקון גלישת PDF בהשוואה במחשב
+- DocumentViewer: הוחלף h-full/min-height בגובה עצמאי clamp(320px,65vh,600px), iframe מסוג block בתוך מסגרת overflow-hidden. מונע תלות מחזורית בגובה כרטיס המכיל גם פרטים וכפתורים.
+- MergeApprovedDocuments: עמודות לפי רוחב זמין בפועל באמצעות auto-fit/minmax, במקום xl לפי רוחב חלון גם בחלונית צרה. אין שינוי בשמירה או בנתונים.
+- קבצים: src/components/documents/DocumentViewer.tsx, src/components/transactions/MergeApprovedDocuments.tsx, PROJECT_STATUS.md. npm run build עבר. בדיקת PDF בדפדפן המשתמשת עדיין נדרשת: השוואת שני קבצים, גלילה, כפתורי אישור/ביטול ללא כיסוי, חלונית צרה ומובייל. אין SQL נוסף.

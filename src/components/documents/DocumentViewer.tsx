@@ -53,11 +53,14 @@ export function DocumentViewer({ storagePath, mimeType }: DocumentViewerProps): 
 
   if (mimeType === "application/pdf") {
     return (
-      <iframe
-        src={signedUrl}
-        title="תצוגת המסמך המקורי"
-        className="h-full min-h-[500px] w-full rounded-lg border border-border"
-      />
+      <div className="relative isolate min-w-0 overflow-hidden rounded-lg border border-border">
+        <iframe
+          src={signedUrl}
+          title="תצוגת המסמך המקורי"
+          className="block w-full border-0"
+          style={{ height: "clamp(320px, 65vh, 600px)" }}
+        />
+      </div>
     );
   }
 
