@@ -1,3 +1,4 @@
+import { toCents } from "@/lib/calc";
 import type { DocumentRow, TransactionRow } from "@/types/db";
 import { validDate } from "./reporting";
 function normalized(value: unknown): string { return typeof value === "string" ? value.normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "").toLowerCase() : ""; }
@@ -9,7 +10,8 @@ export function documentsMayMatch(a: DocumentRow, b: DocumentRow): boolean {
  const name=normalized(x.counterparty_name), other=normalized(y.counterparty_name);
  const business=normalized(x.business_number), otherBusiness=normalized(y.business_number);
  if (business && otherBusiness ? business!==otherBusiness : !name || name!==other) return false;
- if (typeof x.amount_total!=="number" || typeof y.amount_total!=="number" || !Number.isFinite(x.amount_total) || !Number.isFinite(y.amount_total) || x.amount_total<=0 || y.amount_total<=0 || Math.abs(Math.round(x.amount_total*100)-Math.round(y.amount_total*100))>1) return false;
+ if (typeof x.amount_total!=="number" || typeof y.amount_total!=="number" || !Number.isFinite(x.amount_total) || !Number.isFinite(y.amount_total) || x.amount_total<=0 || y.amount_total<=0) return false;
+ try { if (Math.abs(toCents(x.amount_total) - toCents(y.amount_total)) > 1) return false; } catch { return false; }
  if (!["ILS","USD"].includes(String(x.currency??"ILS")) || (x.currency??"ILS")!==(y.currency??"ILS")) return false;
  if (typeof x.doc_date!=="string" || typeof y.doc_date!=="string" || !validDate(x.doc_date) || !validDate(y.doc_date)) return false;
  const invoice=x.doc_type==="invoice_tax"?x:y, receipt=x.doc_type==="receipt"?x:y;

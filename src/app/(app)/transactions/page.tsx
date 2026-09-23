@@ -21,7 +21,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   return <div className="flex min-w-0 flex-col gap-4"><header className="flex items-center justify-between"><h1 className="text-2xl font-bold">תנועות</h1><Link className="rounded bg-primary px-4 py-2 text-white" href="/transactions/new">תנועה חדשה</Link></header>
     {rows.some(row=>row.currency_review_required)&&<p role="alert" className="rounded border border-warning p-3">יש תנועות ישנות שדורשות בדיקת מטבע. הן מסומנות ברשימה ואינן נכללות בסיכומים עד לשמירה מחדש בעריכה.</p>}
     <TransactionFilters key={base.toString()} initial={initial} categories={categories} />
-    <p className="text-sm text-foreground/70">{formatDateDDMMYYYY(range.start)} – {formatDateDDMMYYYY(range.end)} · {results.count} תנועות מאושרות. יתרת המע״מ היא מע״מ הכנסות פחות מע״מ הוצאות לפי אחוז ההכרה.</p>
+    <p className="text-sm text-foreground/70">{formatDateDDMMYYYY(range.start)} – {formatDateDDMMYYYY(range.end)} · {results.count} תנועות. יתרת המע״מ היא מע״מ הכנסות פחות מע״מ הוצאות לפי אחוז ההכרה.</p>
     <TransactionResults key={base.toString() + page} rows={results.rows} categories={names} totals={totals} sort={sort} ascending={ascending} sortBase={base.toString()} />
     <nav aria-label="עמודי תנועות" className="flex justify-center gap-4">{page > 1 && <Link href={pageUrl(page - 1)} scroll={false}>הקודם</Link>}<span>עמוד {page} מתוך {pages}</span>{page < pages && <Link href={pageUrl(page + 1)} scroll={false}>הבא</Link>}</nav>
   </div>;

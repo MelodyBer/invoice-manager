@@ -1,12 +1,9 @@
+import { splitVat, fromCents, toCents, addCents } from "@/lib/calc";
 import type { ExtractionResult, ValidatedExtractionResult } from "@/types/extraction";
 
-const AGORA_TOLERANCE = 0.01;
+const AGORA_TOLERANCE = 1;
 const MIN_YEAR = 2020;
 const DEFAULT_VAT_RATE = 18;
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 export function applyBusinessValidation(result: ExtractionResult): ValidatedExtractionResult {
   const notesToAppend: string[] = [];
@@ -15,11 +12,12 @@ export function applyBusinessValidation(result: ExtractionResult): ValidatedExtr
   let vatAmount = result.vat_amount;
   const amountTotal = result.amount_total;
 
-  const computedTotal = amountBeforeVat + vatAmount;
-  if (Math.abs(computedTotal - amountTotal) > AGORA_TOLERANCE) {
+  const computedTotal = addCents(toCents(amountBeforeVat), toCents(vatAmount));
+  if (Math.abs(computedTotal - toCents(amountTotal)) > AGORA_TOLERANCE) {
     const vatRate = result.vat_rate >= 0 ? result.vat_rate : DEFAULT_VAT_RATE;
-    amountBeforeVat = round2(amountTotal / (1 + vatRate / 100));
-    vatAmount = round2(amountTotal - amountBeforeVat);
+    const split = splitVat(amountTotal, vatRate);
+    amountBeforeVat = fromCents(split.amountBeforeVat);
+    vatAmount = fromCents(split.vatAmount);
     notesToAppend.push("הסכומים לא התאזנו — חושבו מחדש מתוך הסכום הכולל.");
   }
 

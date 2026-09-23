@@ -47,3 +47,9 @@ export function formatFileSize(bytes: number): string {
   const megabytes = kilobytes / 1024;
   return `${megabytes.toFixed(1)} MB`;
 }
+
+/** Formats integer agorot returned by calc.ts. */
+export function formatCentsILS(cents: number): string {
+ if (!Number.isSafeInteger(cents)) throw new Error("סכום באגורות חייב להיות שלם.");
+ return formatCurrencyILS(cents / 100);
+}

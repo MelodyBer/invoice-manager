@@ -27,14 +27,14 @@ assert.throws(() => report.resolveRange({ preset: "custom", start: "2026-09-30",
 assert.equal(report.validDate("2026-02-31"), false);
 assert.equal(report.israelMidnight("2026-01-01"), "2025-12-31T22:00:00.000Z");
 assert.equal(report.israelMidnight("2026-07-01"), "2026-06-30T21:00:00.000Z");
-assert.deepEqual(report.summarize([{ direction: "income", amount_total: 1180, vat_amount: 180 }, { direction: "expense", amount_total: 590, vat_amount: 90, vat_deductible_percent: 66 }]), { income: 1180, expense: 590, vat: 120.6 });
-assert.deepEqual(report.summarize([]), { income: 0, expense: 0, vat: 0 });
-const fixture = Array.from({ length: 101 }, (_, i) => ({ id: String(i), direction: "income", doc_date: "2026-09-01", counterparty_name: "ספק", doc_number: String(i), category_id: "a", document_id: null, amount_before_vat: 1, vat_amount: 0, vat_deductible_percent: 100, amount_total: i + 1 }));
+assert.deepEqual(report.summarize([{ direction: "income", currency:"ILS", is_verified:true, amount_before_vat:1000, amount_total: 1180, vat_amount: 180 }, { direction: "expense", currency:"ILS", is_verified:true, amount_before_vat:500, amount_total: 590, vat_amount: 90, vat_deductible_percent: 66 }]), { income: 118000, expense: 59000, vat: 12060,unverifiedCount:0,foreignCurrencyCount:0 });
+assert.deepEqual(report.summarize([]), { income: 0, expense: 0, vat: 0,unverifiedCount:0,foreignCurrencyCount:0 });
+const fixture = Array.from({ length: 101 }, (_, i) => ({ id: String(i), currency:"ILS", is_verified:true, direction: "income", doc_date: "2026-09-01", counterparty_name: "ספק", doc_number: String(i), category_id: "a", document_id: null, amount_before_vat: 1, vat_amount: 0, vat_deductible_percent: 100, amount_total: i + 1 }));
 const page1 = report.filterAndPage(fixture, { sort: "amount_total", order: "asc" }, { a: "ראשונה" });
 const page2 = report.filterAndPage(fixture, { sort: "amount_total", order: "asc", page: "2" }, { a: "ראשונה" });
 assert.equal(page1.rows.length, 50); assert.equal(page2.rows.length, 50);
 assert.equal(page1.rows[0].amount_total, 1); assert.equal(page2.rows[0].amount_total, 51);
-assert.equal(page1.totals.income, 5151); assert.deepEqual(page1.totals, page2.totals);
+assert.equal(page1.totals.income, 515100); assert.deepEqual(page1.totals, page2.totals);
 assert.equal(report.filterAndPage(fixture, { page: "999" }, {}).rows.length, 1);
 assert.equal(report.filterAndPage(fixture, { q: "100" }, {}).count, 1);
 assert.equal(report.filterAndPage(fixture, { direction: "expense" }, {}).count, 0);

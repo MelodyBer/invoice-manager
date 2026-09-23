@@ -1,6 +1,7 @@
+import { getCurrentPeriod, summarize as calculateSummary, type Summary } from "@/lib/calc";
 import type { ReportingFrequency, TransactionRow } from "@/types/db";
 export type SearchValues = Record<string, string | string[] | undefined>;
-export type Totals = { income: number; expense: number; vat: number };
+export type Totals = { income: number; expense: number; vat: number; unverifiedCount: number; foreignCurrencyCount: number };
 export function first(value: string | string[] | undefined): string { return typeof value === "string" ? value : ""; }
 export function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -9,8 +10,8 @@ export function validDate(value: string): boolean {
 }
 export function todayIsrael(): string { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
 export function monthRange(month: string): { start: string; end: string } {
-  const [year, number] = month.split("-").map(Number);
-  return { start: `${month}-01`, end: `${month}-${new Date(Date.UTC(year, number, 0)).getUTCDate()}` };
+  const {start,end}=getCurrentPeriod(`${month}-01`,"monthly");
+  return {start,end};
 }
 export function resolveRange(params: SearchValues, frequency: ReportingFrequency, today = todayIsrael()): { start: string; end: string; preset: string } {
   const preset = first(params.preset) || "month";
@@ -25,21 +26,12 @@ export function resolveRange(params: SearchValues, frequency: ReportingFrequency
     const date = new Date(Date.UTC(year, month - 2, 1));
     return { ...monthRange(date.toISOString().slice(0, 7)), preset };
   }
-  if (preset === "period" && frequency === "bimonthly") {
-    const startMonth = month % 2 === 0 ? month - 1 : month;
-    return { start: `${year}-${String(startMonth).padStart(2, "0")}-01`, end: monthRange(`${year}-${String(startMonth + 1).padStart(2, "0")}`).end, preset };
-  }
+  if (preset === "period") { const {start,end}=getCurrentPeriod(today,frequency);return {start,end,preset}; }
   return { ...monthRange(today.slice(0, 7)), preset: preset === "period" ? "period" : "month" };
 }
 export function summarize(rows: readonly TransactionRow[]): Totals {
-  let income = 0; let expense = 0; let vat = 0;
-  for (const row of rows) {
-    if (row.currency_review_required) continue;
-    const amount = Math.round(row.amount_total * 100);
-    if (row.direction === "income") { income += amount; vat += Math.round(row.vat_amount * 100); }
-    else { expense += amount; vat -= Math.round(row.vat_amount * row.vat_deductible_percent); }
-  }
-  return { income: income / 100, expense: expense / 100, vat: vat / 100 };
+ const summary:Summary=calculateSummary(rows);
+ return {income:summary.incomeTotal,expense:summary.expenseTotal,vat:summary.vatDue,unverifiedCount:summary.unverifiedCount,foreignCurrencyCount:summary.foreignCurrencyCount};
 }
 export function israelMidnight(date: string): string {
   // Resolve Jerusalem offset at local midnight, including summer/winter time.

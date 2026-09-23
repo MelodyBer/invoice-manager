@@ -25,7 +25,7 @@ const invoice=convertMoney("USD",100,0,100,{...quote,rate:3.1});
 const receipt=convertMoney("USD",100,0,100,{...quote,rate:3.2});
 assert.equal(invoice.amount_total,310);assert.equal(receipt.amount_total,320);
 const {summarize}=load("src/lib/transactions/reporting.ts");
-assert.deepEqual(summarize([{direction:"income",amount_total:310,vat_amount:0},{direction:"income",amount_total:100,currency_review_required:true,vat_amount:0}]),{income:310,expense:0,vat:0});
+assert.deepEqual(summarize([{direction:"income",currency:"ILS",is_verified:true,amount_before_vat:310,amount_total:310,vat_amount:0},{direction:"income",currency:"USD",is_verified:true,amount_before_vat:100,amount_total:100,currency_review_required:true,vat_amount:0}]),{income:31000,expense:0,vat:0,unverifiedCount:0,foreignCurrencyCount:1});
 const values={currency:"USD",direction:"expense",counterpartyName:"ספק",docNumber:"1",docType:"receipt",docDate:"2026-02-08",amountBeforeVat:"100",vatAmount:"0",amountTotal:"100",vatRate:"0",vatDeductiblePercent:0,categoryId:null,notes:""};
 function db(invoiceRow,error=null){const calls=[];return {calls,from(table){const trace={table,filters:[]};calls.push(trace);const chain={};for(const name of ["select","eq"])chain[name]=(...args)=>{trace.filters.push([name,...args]);return chain;};chain.maybeSingle=async()=>({data:invoiceRow,error:null});return chain;},rpc:async(name,args)=>{calls.push({rpc:name,args});return {error,data:error?null:"saved"};}};}
 (async()=>{

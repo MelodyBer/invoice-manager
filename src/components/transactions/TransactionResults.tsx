@@ -4,12 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TransactionDrawer } from "./TransactionDrawer";
-import { formatCurrencyILS, formatDateDDMMYYYY } from "@/lib/format";
+import { formatCurrencyILS, formatCentsILS, formatDateDDMMYYYY } from "@/lib/format";
 import type { TransactionRow } from "@/types/db";
 import type { Totals } from "@/lib/transactions/reporting";
 export const COLUMNS = [["doc_date", "תאריך"], ["direction", "סוג"], ["counterparty_name", "שם הספק או הלקוח"], ["doc_number", "מספר מסמך"], ["category", "קטגוריה"], ["amount_before_vat", "לפני מע״מ"], ["vat_amount", "מע״מ"], ["amount_total", "סה״כ"], ["attachment", "קובץ מצורף"]] as const;
 export function TotalsStrip({ totals }: { totals: Totals }): React.JSX.Element {
-  return <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border bg-background p-3 text-sm" aria-label="סיכום התוצאות"><span className="text-income">סה״כ הכנסות: {formatCurrencyILS(totals.income)}</span><span className="text-expense">סה״כ הוצאות: {formatCurrencyILS(totals.expense)}</span><span>סה״כ מע״מ נטו: {formatCurrencyILS(totals.vat)}</span></div>;
+  return <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border bg-background p-3 text-sm" aria-label="סיכום התוצאות"><span className="text-income">סה״כ הכנסות: {formatCentsILS(totals.income)}</span><span className="text-expense">סה״כ הוצאות: {formatCentsILS(totals.expense)}</span><span>סה״כ מע״מ נטו: {formatCentsILS(totals.vat)}</span>{totals.unverifiedCount>0&&<span role="status">כולל {totals.unverifiedCount} תנועות שלא אושרו.</span>}{totals.foreignCurrencyCount>0&&<span role="status">{totals.foreignCurrencyCount} תנועות במטבע זר אינן נכללות בסיכום המע״מ.</span>}</div>;
 }
 export function TransactionResults({ rows, categories, totals, sort = "doc_date", ascending = false, sortBase }: { rows: TransactionRow[]; categories: Record<string, string>; totals?: Totals; sort?: string; ascending?: boolean; sortBase?: string }): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);

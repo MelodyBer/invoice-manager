@@ -1,36 +1,6 @@
-export type Currency = "ILS" | "USD";
-export interface RateQuote { rate: number; rateDate: string; requestedDate: string; source: "בנק ישראל"; }
-export interface MonetaryValues {
- currency: Currency; original_amount_before_vat: number; original_vat_amount: number; original_amount_total: number;
- exchange_rate: number | null; exchange_rate_date: string | null; amount_before_vat: number; vat_amount: number; amount_total: number; amount_total_usd: number | null;
-}
-export interface ConvertedMonetaryValues extends MonetaryValues {
- exchange_rate: number; exchange_rate_date: string; amount_total_usd: number;
-}
-export function shekelMoney(before: number, vat: number, total: number): MonetaryValues {
- const amounts = [before, vat, total];
- if (!amounts.every(Number.isFinite) || amounts.some(value => value < 0 || value >= 1e10) || total <= 0
-  || amounts.some(value => Math.abs(value * 100 - Math.round(value * 100)) > 0.0001)
-  || Math.abs(Math.round(before * 100) + Math.round(vat * 100) - Math.round(total * 100)) > 1) {
-  throw new Error("סכומים לא תקינים.");
- }
- return { currency: "ILS", original_amount_before_vat: before, original_vat_amount: vat, original_amount_total: total,
-  amount_before_vat: before, vat_amount: Math.round((total - before) * 100) / 100, amount_total: total,
-  exchange_rate: null, exchange_rate_date: null, amount_total_usd: null };
-}
-function roundedDivide(numerator: bigint, denominator: bigint): bigint { return (numerator + denominator / BigInt(2)) / denominator; }
-export function convertMoney(currency: Currency, before: number, vat: number, total: number, quote: RateQuote): ConvertedMonetaryValues {
- if (!["ILS","USD"].includes(currency)) throw new Error("מטבע לא נתמך.");
- if (![before,vat,total,quote.rate].every(Number.isFinite) || before<0 || vat<0 || total<=0 || quote.rate<=0 || Math.abs(Math.round(before*100)+Math.round(vat*100)-Math.round(total*100))>1) throw new Error("סכומים או שער לא תקינים.");
- const rate=BigInt(Math.round(quote.rate*1e8)), scale=BigInt(100000000);
- if(rate<=BigInt(0)) throw new Error("שער ההמרה אינו תקין.");
- const cents=(value:number):bigint=>BigInt(Math.round(value*100));
- const toIls=(value:number):number=>currency==="ILS"?Number(cents(value))/100:Number(roundedDivide(cents(value)*rate,scale))/100;
- const ilsTotal=toIls(total), ilsBefore=toIls(before);
- const usdTotal=currency==="USD"?total:Number(roundedDivide(cents(total)*scale,rate))/100;
- if ([ilsTotal,ilsBefore,usdTotal,total].some(value=>value>=1e10)) throw new Error("הסכום גדול מדי לשמירה.");
- return {currency,original_amount_before_vat:before,original_vat_amount:vat,original_amount_total:total,exchange_rate:quote.rate,exchange_rate_date:quote.rateDate,amount_before_vat:ilsBefore,vat_amount:Math.round((ilsTotal-ilsBefore)*100)/100,amount_total:ilsTotal,amount_total_usd:usdTotal};
-}
+import type { Currency, RateQuote } from "@/lib/calc";
+export { convertMoney, shekelMoney } from "@/lib/calc";
+export type { Currency, RateQuote, MonetaryValues, ConvertedMonetaryValues } from "@/lib/calc";
 export function formatMoney(amount:number,currency:Currency):string {return new Intl.NumberFormat("he-IL",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(amount);}
 export function parseBoiCsv(csv:string, date:string): RateQuote | null {
  // BOI fields may be quoted; parse CSV without depending on an extra library.

@@ -232,3 +232,57 @@ financial-actions.ts רושם שורה אחת save_timing לכל הפעלה של
 - DocumentViewer: הוחלף h-full/min-height בגובה עצמאי clamp(320px,65vh,600px), iframe מסוג block בתוך מסגרת overflow-hidden. מונע תלות מחזורית בגובה כרטיס המכיל גם פרטים וכפתורים.
 - MergeApprovedDocuments: עמודות לפי רוחב זמין בפועל באמצעות auto-fit/minmax, במקום xl לפי רוחב חלון גם בחלונית צרה. אין שינוי בשמירה או בנתונים.
 - קבצים: src/components/documents/DocumentViewer.tsx, src/components/transactions/MergeApprovedDocuments.tsx, PROJECT_STATUS.md. npm run build עבר. בדיקת PDF בדפדפן המשתמשת עדיין נדרשת: השוואת שני קבצים, גלילה, כפתורי אישור/ביטול ללא כיסוי, חלונית צרה ומובייל. אין SQL נוסף.
+
+## מנוע חישוב מרכזי — 23/09/2026
+
+מומש src/lib/calc.ts. ארבע הפונקציות הציבוריות: getReportingPeriods, getCurrentPeriod, summarize, compareToPrevious. כל תוצאות הכסף מוחזרות באגורות שלמות; הקלט של תנועות נשאר בשקלים כפי שהוא נשמר במסד הנתונים. אין שינוי בטבלאות או ב-RLS.
+
+- תקופות מחזירות start/end בפורמט YYYY-MM-DD ושם עברי. Date מפורש באזור הזמן של ישראל.
+- summarize מקבל options עם incomeTaxAdvanceRate (ברירת מחדל 0) ו-taxReserveRate (ברירת מחדל 30). על הקורא להעביר את ערכי הפרופיל כשמציגים מסים.
+- כל החישובים הכספיים משתמשים בשברים שלמים ו-BigInt ובעיגול half-up. הכרה במע״מ מעוגלת בכל תנועה בנפרד. הפלט number שלם בטווח בטוח; חריגה נעצרת.
+- byCategory הוא פירוט ההוצאות לפי categoryId, כולל null ללא קטגוריה. vatAmount הוא המע״מ לפני אחוז ההכרה; percentOfExpenses מחושב לפי ההוצאה לפני מע״מ. אין בו מע״מ של מטבע זר.
+- תנועות לא מאושרות נכללות ומוחזר unverifiedCount. הסינון לפי משתמש וטווח תאריכים נשמר.
+- בתנועות דולר שהומרו, amount_* הקיימים כבר בשקלים: נכללים בהכנסות ובהוצאות, אך המע״מ שלהם מוחרג, ומוחזר foreignCurrencyCount. רשומות ישנות עם currency_review_required אינן מצטרפות לסכומי השקלים, כפי שהיה קודם; מוחזר גם currencyReviewCount.
+- compareToPrevious מחזיר אחוזים בשתי ספרות: 0 מול 0 מחזיר 0; ערך שונה מאפס מול 0 מחזיר null (אין אחוז מוגדר). בסיס שלילי משתמש בערך המוחלט של התקופה הקודמת.
+- splitVat ו-addVat משמשים את טופס התנועה ואת אימות תוצאת החילוץ; convertMoney ו-shekelMoney מרוכזים כאן ומיוצאים מחדש מקובץ המטבע לתאימות.
+- reporting.ts הוא מתאם בלבד למנוע. מסכי התנועות והתאריכון מציגים אגורות דרך formatCentsILS. שמירה למסד הנתונים ממשיכה בשקלים, numeric(12,2). בדיקות האיזון ב-SQL נשארות כהגנת שלמות נתונים.
+- לא נבנו מסכים חדשים ולא השתנה פרומפט החילוץ.
+
+קבצים חדשים:
+- src/lib/calc.ts
+- src/lib/calc.test.ts
+- vitest.config.ts
+
+קבצים ששונו:
+- package.json, package-lock.json, .gitignore
+- scripts/test-transactions.cjs, scripts/test-currency.cjs
+- src/lib/currency/money.ts, src/lib/extraction/validate-result.ts, src/lib/format.ts
+- src/lib/transactions/reporting.ts, load-range.ts, use-transaction-form.ts, validate-values.ts, document-matching.ts
+- src/components/transactions/TransactionResults.tsx
+- src/app/(app)/calendar/page.tsx, src/app/(app)/transactions/page.tsx
+- PROJECT_STATUS.md
+
+פקודות:
+```sh
+npm install -D vitest@4.0.18
+npm test
+node scripts/test-transactions.cjs
+node scripts/test-currency.cjs
+node scripts/test-merge-approved.cjs
+npx eslint src vitest.config.ts
+npm run build
+npm run dev
+```
+
+Vitest נבחר בגרסה תואמת לתלויות הפרויקט. 14 בדיקות מכסות הכנסה והוצאה, הכרה 66% ו-25%, יתרת מע״מ שלילית, תקופה ריקה, 117.65 עם 18%, עיגול חצי אגורה, מטבע זר, תנועות לא מאושרות, קטגוריות, תקופות ושנה מעוברת, השוואה לאפס ובסיס שלילי וחריגה מטווח בטוח.
+בדיקת npm run lint הכללית מדווחת על require בסקריפטי cjs הישנים; יש להבדיל בינה לבין בדיקת קוד האפליקציה והבדיקות החדשות.
+
+בדיקות ידניות:
+1. הכנסה 118 ₪ והוצאה 59 ₪, שתיהן ב-18% והכרה מלאה: יתרת המע״מ 9 ₪. השווי תנועות ותאריכון באותו טווח.
+2. הוצאה עם מע״מ 18 ₪ בהכרה 66% ועוד אחת עם מע״מ 18 ₪ בהכרה 25%: מע״מ תשומות 16.38 ₪.
+3. תקופה ריקה: אפסים. תקופה עם הוצאות בלבד: יתרת מע״מ שלילית.
+4. בטופס: 117.65 ₪ כולל מע״מ ב-18% נותן 99.70 ₪ לפני מע״מ ו-17.95 ₪ מע״מ. עריכת מע״מ ידנית נשמרת, ושדה לא תקין אינו מפיל את הטופס.
+5. תנועה בדולר עם שער שמור: הסיכומים הכספיים משתמשים בשקלים שכבר נשמרו, המע״מ מוחרג ומוצגת הודעה. שמירה בשקלים אינה דורשת שער חיצוני.
+6. תנועה לא מאושרת קיימת נכללת עם הודעה; אין ליצור או לשנות נתוני אמת רק לצורך הבדיקה.
+7. מעבר ינואר–פברואר למרץ–אפריל, וכן חודש פברואר בשנה מעוברת.
+8. התחברות עם משתמש אחר: התנועות של המשתמש הראשון אינן מוצגות.
