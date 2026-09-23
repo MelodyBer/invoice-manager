@@ -3,13 +3,11 @@ import { formatCentsILS, formatCurrencyILS, formatDateDDMMYYYY } from "@/lib/for
 import type { DashboardData } from "@/lib/dashboard/load-dashboard";
 import { PeriodPicker } from "./PeriodPicker";
 import { MonthlyChart } from "./MonthlyChart";
+import { MetricCards } from "./MetricCards";
+import { DEFAULT_METRICS, type DashboardMetricId } from "@/lib/dashboard/metrics";
 
 const panel = "min-w-0 rounded-2xl border border-border bg-background p-5 sm:p-6";
 const link = "rounded-lg text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary";
-function Change({ value }: { value: number | null }): React.JSX.Element {
-    if (value === null) return <p className="mt-3 text-xs text-foreground/60">אין בסיס להשוואה — התקופה הקודמת אפס</p>;
-    return <p className="mt-3 text-sm text-foreground/70"><span aria-hidden="true">{value > 0 ? "↑" : value < 0 ? "↓" : "↔"}</span> {value === 0 ? "ללא שינוי" : `${value > 0 ? "עלייה" : "ירידה"} של ${new Intl.NumberFormat("he-IL", { maximumFractionDigits: 2 }).format(Math.abs(value))}%`} <span className="text-xs">מול התקופה הקודמת</span></p>;
-}
 function Attention({ data }: { data: DashboardData }): React.JSX.Element | null {
     const pending = data.documents.filter(document => document.status !== "failed");
     const failed = data.documents.filter(document => document.status === "failed");
@@ -22,22 +20,16 @@ function Attention({ data }: { data: DashboardData }): React.JSX.Element | null 
     if (!groups.length) return null;
     return <section className={`${panel} border-warning/40`} aria-labelledby="attention-title"><h2 id="attention-title" className="text-lg font-semibold">דורש טיפול</h2><p className="mt-1 text-sm text-foreground/60">תנועות לפי תאריך המסמך, ומסמכים שטרם אושרו לפי תאריך ההעלאה — בתקופה שנבחרה.</p><div className="mt-4 grid gap-4 md:grid-cols-2">{groups.map(group => <details key={group.title} open className="min-w-0 rounded-xl bg-warning/5 p-4"><summary className="cursor-pointer font-medium">{group.title} <span className="tabular-nums">({group.items.length})</span></summary><ul className="mt-3 max-h-64 space-y-3 overflow-y-auto">{group.items.map(item => <li key={item.id} className="min-w-0 border-t border-border pt-3"><p className="truncate text-sm" dir="auto" title={item.title}>{item.title}</p><Link className={`${link} mt-1 inline-block text-sm`} href={item.href}>{item.action}</Link></li>)}</ul></details>)}</div></section>;
 }
-export function DashboardView({ data }: { data: DashboardData }): React.JSX.Element {
+export function DashboardView({ data, selectedMetrics = DEFAULT_METRICS }: { data: DashboardData; selectedMetrics?: DashboardMetricId[] }): React.JSX.Element {
     const { profile, window, totals, comparison } = data;
     const rangeLabel = `${formatDateDDMMYYYY(window.selected.start)}–${formatDateDDMMYYYY(window.selected.end)}`;
     const rangeQuery = new URLSearchParams({ preset: "custom", start: window.selected.start, end: window.selected.end }).toString();
     const names = new Map(data.categories.map(category => [category.id, category.name]));
     const categories = [...totals.byCategory].sort((a, b) => b.amountBeforeVat - a.amountBeforeVat);
-    const cards = [
-        { title: totals.vatDue < 0 ? "החזר מע״מ צפוי" : "מע״מ לתשלום", value: Math.abs(totals.vatDue), change: comparison.vatDue, tone: totals.vatDue < 0 ? "text-income" : "text-primary", featured: true },
-        { title: "הכנסות לפני מע״מ", value: totals.incomeBeforeVat, change: comparison.incomeBeforeVat, tone: "text-income", featured: false },
-        { title: "הוצאות לפני מע״מ", value: totals.expenseBeforeVat, change: comparison.expenseBeforeVat, tone: "text-expense", featured: false },
-        { title: "רווח לפני מס", value: totals.profitBeforeTax, change: comparison.profitBeforeTax, tone: totals.profitBeforeTax < 0 ? "text-expense" : "text-foreground", featured: false },
-    ];
     return <div className="flex min-w-0 flex-col gap-6 tabular-nums">
         <header className="flex flex-col gap-4"><div><p className="mb-1 text-sm text-foreground/60">תמונת המצב של העסק</p><h1 className="break-words text-2xl font-bold sm:text-3xl">שלום, {profile.business_name?.trim() || "העסק שלי"}</h1></div><PeriodPicker key={`${window.preset}-${window.selected.start}-${window.selected.end}`} window={window} /><p className="text-sm text-foreground/60">{window.selected.name} · <span dir="ltr">{rangeLabel}</span></p></header>
         {data.isFirstVisit ? <section className={`${panel} border-primary/30 bg-primary/5`}><h2 className="text-2xl font-semibold">בואי נעשה סדר בחשבוניות</h2><p className="mt-2 text-foreground/70">עדיין אין תנועות בעסק שלך. כך מתחילים:</p><ol className="my-6 grid list-inside list-decimal gap-4 sm:grid-cols-3"><li><strong>מעלים מסמך</strong><p className="mt-1 text-sm">צלמי חשבונית או בחרי קובץ מהמחשב.</p></li><li><strong>בודקים ומאשרים</strong><p className="mt-1 text-sm">בדקי את הפרטים שזוהו ותקני לפי הצורך.</p></li><li><strong>רואים את מצב העסק</strong><p className="mt-1 text-sm">ההכנסות, ההוצאות והמע״מ יתעדכנו כאן.</p></li></ol><Link href="/upload" className="inline-flex rounded-xl bg-primary px-6 py-3 text-lg font-medium text-white">העלאת המסמך הראשון</Link>{data.documents.length > 0 && <p className="mt-4"><Link href="/documents" className={link}>כבר העלית מסמכים? המשיכי לאישור שלהם</Link></p>}</section> : <>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(card => <section key={card.title} className={`${panel} ${card.featured ? "border-primary/40 bg-primary/5 ring-1 ring-primary/15" : ""}`}><h2 className="text-sm font-medium text-foreground/70">{card.title}</h2><p className={`mt-3 break-words text-3xl font-bold tracking-tight ${card.tone}`} dir="ltr">{formatCentsILS(card.value)}</p><Change value={card.change} /></section>)}</div>
+            <MetricCards key={profile.id} totals={totals} comparison={comparison} initialSelection={selectedMetrics} />
             <p className="-mt-3 text-xs text-foreground/60">השוואה ל־{formatDateDDMMYYYY(window.previous.start)}–{formatDateDDMMYYYY(window.previous.end)}. ההשוואה היא בין טווחים מלאים; התקופה הנוכחית עשויה עדיין להיות חלקית.</p>
             {(totals.unverifiedCount > 0 || totals.foreignCurrencyCount > 0 || totals.currencyReviewCount > 0) && <div role="status" className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">{totals.unverifiedCount > 0 && <p>הסיכומים כוללים {totals.unverifiedCount} תנועות שטרם אושרו.</p>}{totals.foreignCurrencyCount > 0 && <p>{totals.foreignCurrencyCount} תנועות במטבע זר אינן נכללות בסיכומי המע״מ. סכומים שהומרו לשקלים נכללים בהכנסות ובהוצאות.</p>}{totals.currencyReviewCount > 0 && <p>{totals.currencyReviewCount} תנועות ישנות דורשות בדיקת מטבע ואינן נכללות בסכומים.</p>}</div>}
             <section className={panel}><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{window.preset === "period" ? "התקופה הנוכחית לדיווח" : "סיכום התקופה שנבחרה"}</h2><p className="mt-1 text-sm text-foreground/60">{window.selected.name} · {rangeLabel}</p></div><Link href={`/export?${rangeQuery}`} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white">ייצא לרואה החשבון</Link></div><dl className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">{[

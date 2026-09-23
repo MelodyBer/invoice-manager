@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { getDashboardWindow, summarize, compareToPrevious, summarizeMonths } from "@/lib/calc";
 import type { DashboardData } from "@/lib/dashboard/load-dashboard";
 import { DashboardView } from "./DashboardView";
+vi.mock("@/lib/dashboard/metric-actions", () => ({ saveDashboardMetrics: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 function fixture(): DashboardData {
     const window = getDashboardWindow("2026-09-23", "bimonthly");
@@ -30,6 +31,13 @@ describe("dashboard server-rendered presentation", () => {
             const css = readdirSync(cssDirectory).filter(file => file.endsWith(".css")).map(file => readFileSync(join(cssDirectory, file), "utf8")).join("\n");
             writeFileSync(join(preview, "index.html"), `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style></head><body style="font-family:Arial,sans-serif"><main style="max-width:1400px;margin:auto;padding:24px">${html}</main></body></html>`);
         }
+    });
+    it("uses gross expense totals and respects hidden cards in server HTML", () => {
+        const data = fixture();
+        const html = renderToStaticMarkup(<DashboardView data={data} selectedMetrics={["expenseTotal"]} />);
+        expect(html).toContain("14,750.00");
+        expect(html).not.toContain('text-sm font-medium text-foreground/70">הוצאות לפני מע״מ</h2>');
+        expect(html).toContain('text-sm font-medium text-foreground/70">הוצאות כולל מע״מ</h2>');
     });
     it("renders a refund and warnings for unverified and foreign rows", () => {
         const data = fixture();
