@@ -14,10 +14,12 @@
     "@anthropic-ai/sdk": "^0.124.0",
     "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.115.0",
+    "jszip": "^3.10.2",
     "next": "15.5.25",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

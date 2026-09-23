@@ -58,6 +58,7 @@ export function TransactionDrawer({ id, onClose }: { id: string; onClose: () => 
     {error && <p role="alert" className="mb-4 rounded border border-expense p-3 text-expense">{error}</p>}
     {!detail && !error && <Spinner />}
     {detail && <>
+      {detail.lockedPeriod && <p role="alert" className="mb-4 rounded border border-warning p-3 text-warning">התנועה הזו בתוך תקופת דיווח שכבר הוגשה לרו״ח ({formatDateDDMMYYYY(detail.lockedPeriod.start)}–{formatDateDDMMYYYY(detail.lockedPeriod.end)}). עריכה כאן לא תעדכן את הדיווח שכבר נשלח.</p>}
       <MoneySummary value={detail.transaction} date={detail.transaction.doc_date} needsReview={detail.transaction.currency_review_required} />
       {editing ? <fieldset disabled={busy}><TransactionForm values={form.values} onFieldChange={form.setField} categories={detail.categories} confidence={null} isVatManuallyEdited={form.isVatManuallyEdited} /></fieldset> : <dl className="grid grid-cols-2 gap-3">{fields.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-sm text-foreground/60">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl>}
       {duplicateId && <section role="alert" className="my-4 rounded border border-warning p-3"><p>נראה שהמסמך הזה כבר קיים במערכת</p><Link className="text-primary underline" href={`/transactions/${duplicateId}`}>צפייה בתנועה הקיימת</Link><div className="mt-2 flex gap-2"><Button disabled={busy} onClick={() => setDuplicateId(null)}>בטל</Button><Button isLoading={busy} onClick={() => void save(true)}>שמור בכל זאת</Button></div></section>}

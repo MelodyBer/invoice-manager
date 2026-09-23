@@ -33,7 +33,7 @@ export function AppShell({ businessName, children }: AppShellProps): React.JSX.E
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="hidden w-56 shrink-0 border-e border-border bg-background md:flex md:flex-col">
+      <aside className="hidden w-56 shrink-0 border-e border-border bg-background md:flex md:flex-col print:hidden">
         <div className="p-4 text-lg font-bold text-primary">מערכת חשבוניות</div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {NAV_LINKS.map((link) => (
@@ -45,7 +45,7 @@ export function AppShell({ businessName, children }: AppShellProps): React.JSX.E
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
+        <header className="flex items-center justify-between border-b border-border px-4 py-3 print:hidden">
           <div className="flex items-center gap-3">
             <button
               type="button"

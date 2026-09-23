@@ -5,7 +5,7 @@ import { userContext } from "./load-range";
 import { validateTransactionValues } from "./validate-values";
 import type { TransactionFormValues } from "@/types/transaction-form";
 import type { TransactionRow, DocumentRow, CategoryRow } from "@/types/db";
-export type Detail = { transaction: TransactionRow; document: DocumentRow | null; documents: DocumentRow[]; categories: CategoryRow[] };
+export type Detail = { transaction: TransactionRow; document: DocumentRow | null; documents: DocumentRow[]; categories: CategoryRow[]; lockedPeriod: { start: string; end: string } | null };
 export type ActionResult = { error?: string; duplicateId?: string; success?: boolean };
 export async function getDetail(id: string): Promise<{ detail?: Detail; error?: string }> {
   const { supabase, userId } = await userContext();
@@ -25,7 +25,9 @@ export async function getDetail(id: string): Promise<{ detail?: Detail; error?: 
   if (attachments.error) return { error: "לא ניתן לטעון את המסמכים המצורפים." };
   const documents = [...(attachments.data ?? [])];
   if (document && !documents.some(item => item.id === document.id)) documents.unshift(document);
-  return { detail: { transaction, document, documents, categories: categories ?? [] } };
+  const lockedPeriodResult = await supabase.from("periods").select("period_start, period_end").eq("user_id", userId).eq("status", "closed").lte("period_start", transaction.doc_date).gte("period_end", transaction.doc_date).maybeSingle();
+  const lockedPeriod = lockedPeriodResult.data ? { start: lockedPeriodResult.data.period_start, end: lockedPeriodResult.data.period_end } : null;
+  return { detail: { transaction, document, documents, categories: categories ?? [], lockedPeriod } };
 }
 export async function updateTransaction(id: string, values: TransactionFormValues, expectedUpdatedAt: string, allowDuplicate = false): Promise<ActionResult> {
   const { supabase, userId } = await userContext();
