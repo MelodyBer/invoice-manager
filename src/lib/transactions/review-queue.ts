@@ -1,9 +1,11 @@
 import type { createClient } from "@/lib/supabase/client";
 import type { DocumentRow } from "@/types/db";
-export async function loadReviewQueue(supabase: ReturnType<typeof createClient>, userId: string): Promise<DocumentRow[]> {
+export async function loadReviewQueue(supabase: ReturnType<typeof createClient>, userId: string, range?: { start: string; endExclusive: string }): Promise<DocumentRow[]> {
   const queue: DocumentRow[] = [];
   for (let offset = 0; ; offset += 200) {
-    const batch = await supabase.from("documents").select("*").eq("user_id", userId).is("dismissed_at", null).is("transaction_id", null).order("uploaded_at").order("id").range(offset, offset + 199);
+    let query = supabase.from("documents").select("*").eq("user_id", userId).is("dismissed_at", null).is("transaction_id", null).order("uploaded_at").order("id").range(offset, offset + 199);
+    if (range) query = query.gte("uploaded_at", range.start).lt("uploaded_at", range.endExclusive);
+    const batch = await query;
     if (batch.error) throw new Error("לא ניתן לטעון את המסמכים.");
     const documents = batch.data ?? [];
     if (!documents.length) return queue;

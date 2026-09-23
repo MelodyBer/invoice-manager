@@ -53,3 +53,9 @@ export function formatCentsILS(cents: number): string {
  if (!Number.isSafeInteger(cents)) throw new Error("סכום באגורות חייב להיות שלם.");
  return formatCurrencyILS(cents / 100);
 }
+
+/** Axis labels only: no business calculation or persisted value is changed. */
+export function formatCompactCentsILS(cents: number): string {
+  const formatted = new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", notation: "compact", maximumFractionDigits: 1 }).format(cents / 100);
+  return formatted.replace(/K/g, " אלף").replace(/M/g, " מיליון").replace(/B/g, " מיליארד").replace(/T/g, " טריליון");
+}

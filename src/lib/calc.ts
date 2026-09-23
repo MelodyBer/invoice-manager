@@ -225,3 +225,58 @@ export function convertMoney(currency: Currency, before: number, vat: number, to
         throw new Error("הסכום גדול מדי לשמירה.");
     return { currency, original_amount_before_vat: before, original_vat_amount: vat, original_amount_total: total, exchange_rate: quote.rate, exchange_rate_date: quote.rateDate, amount_before_vat: fromCents(ilsBefore), vat_amount: fromCents(addCents(ilsTotal, -ilsBefore)), amount_total: fromCents(ilsTotal), amount_total_usd: fromCents(usdTotal) };
 }
+
+export type DashboardPreset = "period" | "month" | "year" | "custom";
+export interface DashboardWindow {
+    preset: DashboardPreset;
+    selected: ReportingPeriod;
+    previous: ReportingPeriod;
+    months: ReportingPeriod[];
+    daysRemaining: number;
+    endExclusive: string;
+    chartThrough: string;
+}
+function shiftDate(date: string, days: number): string {
+    const value = new Date(`${date}T12:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+}
+/** All dashboard date arithmetic lives alongside the reporting-period calculations. */
+export function getDashboardWindow(today: string, frequency: ReportingFrequency, preset: DashboardPreset = "period", start?: string, end?: string): DashboardWindow {
+    const current = getCurrentPeriod(today, frequency);
+    let selected: ReportingPeriod = current;
+    if (preset === "month") selected = getCurrentPeriod(today, "monthly");
+    if (preset === "year") {
+        const periods = getReportingPeriods(Number(today.slice(0, 4)), "monthly");
+        selected = { start: periods[0].start, end: periods[11].end, name: `שנת ${today.slice(0, 4)}` };
+    }
+    if (preset === "custom") {
+        if (!start || !end || start > end) throw new Error("יש לבחור טווח תאריכים תקין.");
+        getCurrentPeriod(start, "monthly"); getCurrentPeriod(end, "monthly");
+        selected = { start, end, name: "הטווח שנבחר" };
+    }
+    // Reserve a previous year and the 12-month history within the supported calendar range.
+    if (Number(selected.start.slice(0, 4)) < 1901 || Number(selected.end.slice(0, 4)) > 2200) throw new Error("יש לבחור תאריכים בין השנים 1901 ו־2200.");
+    const previousEnd = shiftDate(selected.start, -1);
+    let previous: ReportingPeriod;
+    if (preset === "period" || preset === "month") previous = getCurrentPeriod(previousEnd, preset === "month" ? "monthly" : frequency);
+    else if (preset === "year") {
+        const year = Number(selected.start.slice(0, 4)) - 1;
+        previous = { start: `${year}-01-01`, end: `${year}-12-31`, name: `שנת ${year}` };
+    } else {
+        const days = (Date.parse(selected.end) - Date.parse(selected.start)) / 86400000 + 1;
+        previous = { start: shiftDate(selected.start, -days), end: previousEnd, name: "הטווח הקודם באותו אורך" };
+    }
+    const chartThrough = selected.end < today ? selected.end : today;
+    const year = Number(chartThrough.slice(0, 4));
+    const months = [...getReportingPeriods(year - 1, "monthly"), ...getReportingPeriods(year, "monthly")]
+        .filter(month => month.start <= chartThrough).slice(-12);
+    return { preset, selected, previous, months, chartThrough, endExclusive: shiftDate(selected.end, 1), daysRemaining: Math.max(0, (Date.parse(selected.end) - Date.parse(today)) / 86400000) };
+}
+export interface MonthlySummary { month: string; label: string; income: number; expense: number; }
+export function summarizeMonths(transactions: readonly (CalcTransaction & { doc_date: string })[], months: readonly ReportingPeriod[], through: string): MonthlySummary[] {
+    return months.map(month => {
+        const totals = summarize(transactions.filter(row => row.doc_date >= month.start && row.doc_date <= month.end && row.doc_date <= through));
+        return { month: month.start, label: month.name, income: totals.incomeBeforeVat, expense: totals.expenseBeforeVat };
+    });
+}
