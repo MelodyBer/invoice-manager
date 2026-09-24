@@ -35,7 +35,8 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
   const alreadySubmitted = Boolean(submittedResult?.data);
 
   const today = todayIsrael();
-  const filterInitial = { preset: range.preset, date: first(params.date) || today, start: first(params.start) || range.start, end: first(params.end) || range.end };
+  const currentYear = Number(today.slice(0, 4));
+  const filterInitial = { preset: range.preset, date: first(params.date) || today, start: first(params.start) || range.start, end: first(params.end) || range.end, year: first(params.year) || String(currentYear) };
   const query = new URLSearchParams({ preset: range.preset, start: range.start, end: range.end }).toString();
   const { summary } = data;
 
@@ -46,7 +47,7 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
         <Link href="/export/history" className="text-sm text-primary underline">היסטוריית ייצואים</Link>
       </header>
 
-      <ExportFilters key={`${range.preset}-${range.start}-${range.end}`} initial={filterInitial} />
+      <ExportFilters key={`${range.preset}-${range.start}-${range.end}`} initial={filterInitial} currentYear={currentYear} />
 
       <p className="text-sm text-foreground/70">{range.label} · {formatDateDDMMYYYY(range.start)} – {formatDateDDMMYYYY(range.end)}</p>
 
