@@ -105,29 +105,38 @@ export function DropZone({ onFilesSelected, autoOpenCamera = false }: DropZonePr
         aria-label="בחירת קבצים להעלאה"
       />
 
-      {isCameraAvailable ? (
-        <>
-          <button
-            type="button"
-            onClick={() => cameraInputRef.current?.click()}
-            className="self-start rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5 focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            צלמי מסמך
-          </button>
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(event) => {
-              handleFiles(event.target.files);
-              event.target.value = "";
-            }}
-            className="sr-only"
-            aria-label="צילום מסמך במצלמה"
-          />
-        </>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="self-start rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5 focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          בחירת קובץ מהמכשיר
+        </button>
+        {isCameraAvailable ? (
+          <>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="self-start rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              צלמי מסמך
+            </button>
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(event) => {
+                handleFiles(event.target.files);
+                event.target.value = "";
+              }}
+              className="sr-only"
+              aria-label="צילום מסמך במצלמה"
+            />
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

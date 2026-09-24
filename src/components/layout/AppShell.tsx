@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { NAV_LINKS } from "./nav-links";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { FloatingUploadButton } from "./FloatingUploadButton";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface AppShellProps {
   businessName: string | null;
@@ -59,9 +60,12 @@ export function AppShell({ businessName, children }: AppShellProps): React.JSX.E
             </button>
             <span className="font-semibold text-foreground">{businessName ?? "העסק שלי"}</span>
           </div>
-          <Button variant="ghost" onClick={() => void handleLogout()}>
-            יציאה
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button variant="ghost" onClick={() => void handleLogout()}>
+              יציאה
+            </Button>
+          </div>
         </header>
 
         <main className="min-w-0 flex-1 p-4 pb-36 md:pb-4">{children}</main>

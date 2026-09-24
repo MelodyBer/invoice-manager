@@ -44,19 +44,21 @@ export default function SignupPage(): React.JSX.Element {
         emailRedirectTo: `${window.location.origin}/auth/confirmed`,
       },
     });
-    setIsSubmitting(false);
 
     if (error) {
+      setIsSubmitting(false);
       setFormError(getAuthErrorMessage(error));
       return;
     }
 
     if (data.session) {
+      // Stays "loading" until the page itself changes, so the wait for /dashboard's data doesn't look like nothing is happening.
       router.push("/dashboard");
       router.refresh();
       return;
     }
 
+    setIsSubmitting(false);
     setInfoMessage("נשלח אליך מייל לאישור ההרשמה. יש לאשר את הכתובת כדי להתחבר.");
   }
 

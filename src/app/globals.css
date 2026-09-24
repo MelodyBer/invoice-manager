@@ -21,8 +21,10 @@
   --font-sans: var(--font-heebo);
 }
 
+/* Manual toggle (ThemeToggle) sets data-theme on <html> and wins over the OS preference below;
+   with no data-theme set, prefers-color-scheme decides, matching the previous behavior. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --background: #0a0a0a;
     --foreground: #ededed;
     --border: #2e2e2e;
@@ -31,6 +33,16 @@
     --expense: #ef4444;
     --warning: #f59e0b;
   }
+}
+
+:root[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --border: #2e2e2e;
+  --primary: #3b82f6;
+  --income: #22c55e;
+  --expense: #ef4444;
+  --warning: #f59e0b;
 }
 
 body {

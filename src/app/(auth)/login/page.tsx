@@ -31,13 +31,14 @@ export default function LoginPage(): React.JSX.Element {
     setIsSubmitting(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setIsSubmitting(false);
 
     if (error) {
+      setIsSubmitting(false);
       setFormError(getAuthErrorMessage(error));
       return;
     }
 
+    // Stays "loading" until the page itself changes, so the wait for /dashboard's data doesn't look like nothing is happening.
     router.push("/dashboard");
     router.refresh();
   }

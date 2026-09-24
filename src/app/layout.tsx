@@ -47,7 +47,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" suppressHydrationWarning>
+      <head>
+        {/* Blocking so the manual theme choice applies before first paint — no flash of the wrong colors. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={`${heebo.variable} antialiased`}>
         <ToastProvider>{children}</ToastProvider>
         <RegisterServiceWorker />
