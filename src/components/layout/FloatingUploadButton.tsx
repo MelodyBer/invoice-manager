@@ -3,27 +3,31 @@
 import { useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CameraIcon } from "./nav-icons";
+import { Button, Dialog } from "@/components/ui";
 import { setPendingCapture } from "@/lib/upload/pending-capture";
 
 const CAMERA_BOTTOM_OFFSET = { bottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))" };
 
-/** Quick access to the camera from anywhere on mobile; hidden where it would collide with the page's own
- * bottom action bar (/upload already has this action, and the review screen has its own sticky save buttons).
- * Opens the camera directly from a real click (required on iOS/Android — a click after navigating to a new
- * page no longer counts as a user gesture), then hands the photo to /upload once it's captured. */
+/** Quick access to adding a document from anywhere on mobile; hidden where it would collide with the
+ * page's own bottom action bar (/upload already has this action, and the review screen has its own
+ * sticky save buttons). Tapping the button opens a choice (camera or file) instead of jumping straight
+ * into the camera — a native camera view is a full-screen OS surface with nothing of the page visible
+ * behind it, so a fallback message can only show before or after it, never over it. Each choice then
+ * clicks its hidden input directly from that same tap, which real devices require for the native
+ * picker to open at all — a click fired later from a useEffect after navigating no longer counts. */
 export function FloatingUploadButton(): React.JSX.Element | null {
   const pathname = usePathname();
   const router = useRouter();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showFallback, setShowFallback] = useState(false);
+  const [isChoiceOpen, setIsChoiceOpen] = useState(false);
 
   if (pathname === "/upload" || /^\/documents\/[^/]+\/review$/.test(pathname)) return null;
 
   function handleCaptured(files: FileList | null): void {
     if (!files || files.length === 0) return;
     setPendingCapture(Array.from(files));
-    setShowFallback(false);
+    setIsChoiceOpen(false);
     router.push("/upload");
   }
 
@@ -36,7 +40,7 @@ export function FloatingUploadButton(): React.JSX.Element | null {
         capture="environment"
         onChange={(event) => handleCaptured(event.target.files)}
         className="sr-only"
-        aria-label="צילום חשבונית מהיר"
+        aria-label="צילום חשבונית"
       />
       <input
         ref={fileInputRef}
@@ -50,43 +54,22 @@ export function FloatingUploadButton(): React.JSX.Element | null {
 
       <button
         type="button"
-        onClick={() => {
-          setShowFallback(true);
-          cameraInputRef.current?.click();
-        }}
-        aria-label="צילום חשבונית מהיר"
+        onClick={() => setIsChoiceOpen(true)}
+        aria-label="הוספת מסמך"
         style={CAMERA_BOTTOM_OFFSET}
         className="fixed end-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform hover:scale-105 md:hidden print:hidden"
       >
         <CameraIcon className="h-7 w-7" />
       </button>
 
-      {showFallback && (
-        <div
-          role="status"
-          style={CAMERA_BOTTOM_OFFSET}
-          className="fixed inset-x-4 z-40 flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3 shadow-lg md:hidden"
-        >
-          <p className="text-sm">אפשר גם להעלות קובץ קיים מהטלפון</p>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-foreground/5"
-            >
-              בחירת קובץ
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowFallback(false)}
-              aria-label="סגירת ההודעה"
-              className="rounded-lg p-1.5 text-foreground/60 hover:bg-foreground/5"
-            >
-              ✕
-            </button>
-          </div>
+      <Dialog isOpen={isChoiceOpen} onClose={() => setIsChoiceOpen(false)} title="הוספת מסמך">
+        <div className="flex flex-col gap-3">
+          <Button onClick={() => cameraInputRef.current?.click()}>צילום מסמך</Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+            בחירת קובץ מהמכשיר
+          </Button>
         </div>
-      )}
+      </Dialog>
     </>
   );
 }
