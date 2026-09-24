@@ -10,6 +10,7 @@ import { FileListItem } from "@/components/upload/FileListItem";
 import { validateFile, resolveMimeType, isPreviewableImage } from "@/lib/upload/validation";
 import { compressImageIfNeeded } from "@/lib/upload/compress-image";
 import { buildStoragePath, getExtensionFromMimeType } from "@/lib/upload/storage-path";
+import { takePendingCapture } from "@/lib/upload/pending-capture";
 import type { Direction } from "@/types/db";
 import type { UploadFileItem } from "@/types/upload";
 
@@ -44,6 +45,12 @@ export default function UploadPageClient({ autoOpenCamera }: { autoOpenCamera: b
       setUserId(data.user?.id ?? null);
     });
   }, [supabase]);
+
+  useEffect(() => {
+    const captured = takePendingCapture();
+    if (captured) handleFilesSelected(captured);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
