@@ -38,3 +38,15 @@ body {
   color: var(--foreground);
   font-family: var(--font-heebo), Arial, Helvetica, sans-serif;
 }
+
+/* Unlayered: wins over Tailwind's text-sm utility so focused fields never drop below 16px,
+   which is what stops iOS Safari from auto-zooming in on tap. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

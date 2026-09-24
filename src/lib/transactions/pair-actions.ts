@@ -93,7 +93,7 @@ export async function approveDocumentPair(id:string,otherId:string,values:Transa
    if(saved.error)return {errorMessage:"החיבור לא נשמר. רענני ובדקי אם מסמך כבר אושר או השתנה."};
    revalidatePath("/documents");revalidatePath("/transactions");revalidatePath("/calendar");
    return {errorMessage:null};
- }catch(error){return {errorMessage:error instanceof Error?error.message:"חישוב המטבע נכשל."};}
+ }catch(error){return {errorMessage:error instanceof Error?error.message:"חישוב המטבע נכשל. נסי שוב."};}
 }
 export async function dismissDocument(id: string): Promise<{error?:string}> {
  const {supabase}=await userContext();

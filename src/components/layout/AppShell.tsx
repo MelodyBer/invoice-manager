@@ -6,6 +6,8 @@ import { useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui";
 import { NAV_LINKS } from "./nav-links";
+import { MobileBottomNav } from "./MobileBottomNav";
+import { FloatingUploadButton } from "./FloatingUploadButton";
 
 interface AppShellProps {
   businessName: string | null;
@@ -62,8 +64,11 @@ export function AppShell({ businessName, children }: AppShellProps): React.JSX.E
           </Button>
         </header>
 
-        <main className="min-w-0 flex-1 p-4">{children}</main>
+        <main className="min-w-0 flex-1 p-4 pb-36 md:pb-4">{children}</main>
       </div>
+
+      <MobileBottomNav />
+      <FloatingUploadButton />
 
       {isMobileMenuOpen ? (
         <div className="fixed inset-0 z-40 flex md:hidden">

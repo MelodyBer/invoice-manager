@@ -36,8 +36,8 @@ describe("dashboard server-rendered presentation", () => {
         const data = fixture();
         const html = renderToStaticMarkup(<DashboardView data={data} selectedMetrics={["expenseTotal"]} />);
         expect(html).toContain("14,750.00");
-        expect(html).not.toContain('text-sm font-medium text-foreground/70">הוצאות לפני מע״מ</h2>');
-        expect(html).toContain('text-sm font-medium text-foreground/70">הוצאות כולל מע״מ</h2>');
+        expect(html).not.toContain('text-xs font-medium text-foreground/70 sm:text-sm">הוצאות לפני מע״מ</h2>');
+        expect(html).toContain('text-xs font-medium text-foreground/70 sm:text-sm">הוצאות כולל מע״מ</h2>');
     });
     it("renders a refund and warnings for unverified and foreign rows", () => {
         const data = fixture();

@@ -380,7 +380,7 @@ export default function DocumentReviewPage(): React.JSX.Element {
           </fieldset>
       </ReviewComparison>
 
-      <div className="sticky bottom-0 z-10 flex flex-wrap gap-3 border-t border-border bg-background p-4 shadow-lg">
+      <div className="sticky bottom-16 z-10 flex flex-wrap gap-3 border-t border-border bg-background p-4 shadow-lg md:bottom-0">
         <Button onClick={() => void handleSaveClick(false)} isLoading={isSaving} disabled={saveBlocked}>
           {pair ? "אשר חיבור ושמור כתנועה אחת" : "אשר ושמור"}
         </Button>

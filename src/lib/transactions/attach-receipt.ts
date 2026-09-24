@@ -12,7 +12,7 @@ export async function searchInvoices(documentId:string,term:string):Promise<{inv
  let query=supabase.from("transactions").select("*").eq("user_id",userId).eq("is_verified",true).eq("doc_type","invoice_tax").eq("direction",source.data.direction);
  if(search)query=query.or(`counterparty_name.ilike.%${search}%,doc_number.ilike.%${search}%`);
  const result=await query.order("doc_date",{ascending:false}).limit(20);
- return result.error?{invoices:[],error:"חיפוש החשבוניות נכשל."}:{invoices:result.data??[]};
+ return result.error?{invoices:[],error:"חיפוש החשבוניות נכשל. נסי שוב."}:{invoices:result.data??[]};
 }
 export async function attachReceipt(documentId:string,invoiceId:string,expectedUpdatedAt:string,values:TransactionFormValues):Promise<{error?:string}>{
  const {supabase,userId}=await userContext();
@@ -26,5 +26,5 @@ export async function attachReceipt(documentId:string,invoiceId:string,expectedU
   if(error)return {error:"הצירוף לא הושלם. ייתכן שהחשבונית השתנתה או שהקבלה כבר אושרה. רענני ונסי שוב."};
   revalidatePath("/documents");revalidatePath("/transactions");revalidatePath(`/transactions/${invoiceId}`);revalidatePath("/calendar");
   return {};
- }catch(error){return {error:error instanceof Error?error.message:"הצירוף נכשל."};}
+ }catch(error){return {error:error instanceof Error?error.message:"הצירוף נכשל. נסי שוב."};}
 }

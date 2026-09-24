@@ -5,15 +5,24 @@ import { useCameraAvailable } from "@/lib/upload/use-camera-available";
 
 interface DropZoneProps {
   onFilesSelected: (files: File[]) => void;
+  autoOpenCamera?: boolean;
 }
 
 const ACCEPTED_INPUT_TYPES = "image/jpeg,image/png,image/heic,application/pdf";
 
-export function DropZone({ onFilesSelected }: DropZoneProps): React.JSX.Element {
+export function DropZone({ onFilesSelected, autoOpenCamera = false }: DropZoneProps): React.JSX.Element {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const isCameraAvailable = useCameraAvailable();
+  const hasAutoOpenedRef = useRef(false);
+
+  useEffect(() => {
+    if (autoOpenCamera && isCameraAvailable && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      cameraInputRef.current?.click();
+    }
+  }, [autoOpenCamera, isCameraAvailable]);
 
   const handleFiles = useCallback(
     (fileList: FileList | null) => {
