@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Input } from "@/components/ui";
@@ -42,7 +43,7 @@ export function ConnectionsForm(props: Props): React.JSX.Element {
   return <div className="mx-auto flex max-w-3xl flex-col gap-5">
     <h1 className="text-2xl font-bold">חיבורים וייבוא</h1>
     <p>כאן מגדירים את החשבונות ואת השמות לזיהוי במסמכים. ההגדרות אישיות לחשבון שלך.</p>
-    <div className="rounded-xl border border-border bg-primary/5 p-4">בשלב זה אפשר להגדיר ולחבר חשבונות. משיכת המסמכים תתווסף בשלב הבא; חיבור חשבון אינו מתחיל ייבוא.</div>
+    <div className="rounded-xl border border-border bg-primary/5 p-4">לאחר חיבור Gmail ושמירת השמות, אפשר לבחור טווח תאריכים ולייבא מסמכים לאישור. חיבור חשבון לבדו אינו מתחיל ייבוא.</div>
     {!props.databaseReady && <p role="alert">נדרשת הכנה חד־פעמית של מסד הנתונים לפני שמירת ההגדרות.</p>}
     <p role="status" aria-live="polite" className="empty:hidden">{message}</p>
     <Card>
@@ -61,6 +62,7 @@ export function ConnectionsForm(props: Props): React.JSX.Element {
       <p className="mb-3 text-sm">Google תבקש הרשאת קריאה למיילים ולקבצים המצורפים. ההרשאה מאפשרת קריאת התיבה; השמות שתגדירי ישמשו לסינון בתוך המערכת. אין הרשאה לשלוח או למחוק הודעות.</p>
       {!props.gmailReady && <p className="mb-3">החיבור יהיה זמין לאחר השלמת הגדרת Google וההצפנה בשרת.</p>}
       <form action={startGmailConnection}><Button type="submit" disabled={!props.gmailReady || busy !== null}>{gmail ? "בחר חשבון Google מחדש" : "חבר חשבון Google"}</Button></form>
+      {gmail && <p className="my-3"><Link href="/settings/integrations/gmail" className="text-primary underline">חיפוש וייבוא מסמכים מ־Gmail</Link></p>}
       {gmail && <Button variant="ghost" disabled={busy !== null} onClick={() => setConfirmDisconnect("gmail")}>נתק Gmail</Button>}
     </Card>
     <Card>

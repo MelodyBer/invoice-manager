@@ -1,3 +1,4 @@
+import type { GmailImportRow, GmailImportInsert, GmailImportUpdate } from "./gmail-import";
 export type FinancialColumns = {
  original_amount_before_vat: number | null;
  original_vat_amount: number | null;
@@ -179,6 +180,7 @@ export type PeriodUpdate = Partial<Omit<PeriodRow, "id" | "user_id" | "created_a
 export type Database = {
   public: {
     Tables: {
+      gmail_import_items: { Row: GmailImportRow; Insert: GmailImportInsert; Update: GmailImportUpdate; Relationships: [] };
       integration_settings: {
         Row: { user_id: string; recognition_names: string[]; updated_at: string };
         Insert: { user_id: string; recognition_names?: string[]; updated_at?: string };
@@ -224,6 +226,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      import_gmail_document: { Args: { p_item_id: string }; Returns: string };
       merge_approved_documents: { Args: { p_invoice_id: string; p_receipt_id: string; p_invoice_version: string; p_receipt_version: string }; Returns: string };
       save_financial_record: { Args: { p_values: Record<string, unknown>; p_document_values?: Record<string, unknown>; p_transaction_id?: string; p_expected_updated_at?: string; p_attach_only?: boolean }; Returns: string };
       confirm_documents: { Args: { p_document_ids: string[]; p_values: Record<string, unknown>; p_expected_updated_at?: string }; Returns: string };
