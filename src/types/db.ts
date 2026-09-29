@@ -179,6 +179,18 @@ export type PeriodUpdate = Partial<Omit<PeriodRow, "id" | "user_id" | "created_a
 export type Database = {
   public: {
     Tables: {
+      integration_settings: {
+        Row: { user_id: string; recognition_names: string[]; updated_at: string };
+        Insert: { user_id: string; recognition_names?: string[]; updated_at?: string };
+        Update: { recognition_names?: string[]; updated_at?: string };
+        Relationships: [];
+      };
+      integration_connections: {
+        Row: { user_id: string; provider: "gmail" | "payplus"; account_label: string; encrypted_credentials: string; connected_at: string };
+        Insert: { user_id: string; provider: "gmail" | "payplus"; account_label: string; encrypted_credentials: string; connected_at?: string };
+        Update: { account_label?: string; encrypted_credentials?: string; connected_at?: string };
+        Relationships: [];
+      };
       profiles: {
         Row: ProfileRow;
         Insert: ProfileInsert;

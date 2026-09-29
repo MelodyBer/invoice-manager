@@ -10,5 +10,6 @@ export const NAV_LINKS: readonly NavLink[] = [
   { href: "/transactions", label: "תנועות" },
   { href: "/calendar", label: "תאריכון" },
   { href: "/export", label: "ייצוא לרו״ח" },
+  { href: "/settings/integrations", label: "חיבורים וייבוא" },
   { href: "/settings", label: "הגדרות" },
 ];
